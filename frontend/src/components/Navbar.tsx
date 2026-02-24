@@ -24,6 +24,7 @@ export default function Navbar() {
       <div>
         <Link to="/login" style={{ color: "white", marginRight: "20px", textDecoration: "none", fontWeight: "bold" }}>Login</Link>
         <Link to="/users" style={{ color: "white", textDecoration: "none", fontWeight: "bold" }}>Users</Link>
+        <Link to="/cats" style={{ color: "white", textDecoration: "none", fontWeight: "bold" }}>Cats</Link>
       </div>
     </nav>
   );
