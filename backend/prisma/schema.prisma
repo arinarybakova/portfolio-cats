@@ -10,6 +10,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url = env("DATABASE_URL")
 }
 
 model User {
@@ -26,12 +27,22 @@ model User {
 model Cat {
   id        Int     @id @default(autoincrement())
   name      String
-  age       Int
-  breed     String  
+  age       Int  
   status    String
   image String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  breedId   Int
+  breed     Breed   @relation(fields: [breedId], references: [id])
+
+  @@index([breedId])
+}
+
+model Breed {
+  id        Int     @id @default(autoincrement())
+  name      String  @unique
+  cats      Cat[]
+  createdAt DateTime @default(now())
 }
 
 enum Role {
