@@ -1,16 +1,30 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+/* ================= TYPES ================= */
+
+type Breed = {
+  id: number;
+  name: string;
+};
+
 type Cat = {
   id: number;
   name: string;
   age: number;
-  breed: string;
+  status: string;
   image?: string;
+  breedId: number;
+  breed: Breed;
 };
 
+/* ================= COMPONENT ================= */
+
 export default function CatsList() {
+  const navigate = useNavigate();
+
   const [cats, setCats] = useState<Cat[]>([]);
+  const [breeds, setBreeds] = useState<Breed[]>([]);
   const [editing, setEditing] = useState<Cat | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [loadingImage, setLoadingImage] = useState(false);
@@ -18,25 +32,38 @@ export default function CatsList() {
   const [form, setForm] = useState({
     name: "",
     age: "",
-    breed: "",
+    breedId: "",
     image: "",
   });
 
-  const navigate = useNavigate();
-
-  /* ================= LOAD ================= */
+  /* ================= LOAD DATA ================= */
 
   const loadCats = async () => {
-    const res = await fetch("http://localhost:5000/cats");
-    const data = await res.json();
-    setCats(data);
+    try {
+      const res = await fetch("http://localhost:5000/cats");
+      const data = await res.json();
+      setCats(data);
+    } catch (err) {
+      console.error("Failed to load cats");
+    }
+  };
+
+  const loadBreeds = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/breeds");
+      const data = await res.json();
+      setBreeds(data);
+    } catch (err) {
+      console.error("Failed to load breeds");
+    }
   };
 
   useEffect(() => {
     loadCats();
+    loadBreeds();
   }, []);
 
-  /* ================= GENERATE REAL CAT IMAGE ================= */
+  /* ================= IMAGE GENERATION ================= */
 
   const generateRealCat = async () => {
     try {
@@ -44,12 +71,12 @@ export default function CatsList() {
       const res = await fetch("https://api.thecatapi.com/v1/images/search");
       const data = await res.json();
 
-      setForm({
-        ...form,
-        image: data[0].url,
-      });
+      setForm((prev) => ({
+        ...prev,
+        image: data[0]?.url || "",
+      }));
     } catch (err) {
-      console.error("Failed to load cat image");
+      console.error("Image generation failed");
     } finally {
       setLoadingImage(false);
     }
@@ -58,22 +85,41 @@ export default function CatsList() {
   /* ================= CREATE ================= */
 
   const handleCreate = async () => {
-    if (!form.name || !form.age || !form.breed) return;
+    if (!form.name || !form.age || !form.breedId) {
+      alert("Please fill all fields");
+      return;
+    }
 
-    await fetch("http://localhost:5000/cats", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: form.name,
-        age: Number(form.age),
-        breed: form.breed,
-        image: form.image,
-      }),
-    });
+    try {
+      const res = await fetch("http://localhost:5000/cats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          age: Number(form.age),
+          image: form.image,
+          breedId: Number(form.breedId),
+          status: "AVAILABLE",
+        }),
+      });
 
-    setForm({ name: "", age: "", breed: "", image: "" });
-    setShowAdd(false);
-    loadCats();
+      if (!res.ok) {
+        throw new Error("Failed to create cat");
+      }
+
+      setForm({
+        name: "",
+        age: "",
+        breedId: "",
+        image: "",
+      });
+
+      setShowAdd(false);
+      loadCats();
+    } catch (err) {
+      console.error(err);
+      alert("Error creating cat");
+    }
   };
 
   /* ================= UPDATE ================= */
@@ -81,46 +127,63 @@ export default function CatsList() {
   const handleSaveEdit = async () => {
     if (!editing) return;
 
-    await fetch(`http://localhost:5000/cats/${editing.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editing),
-    });
+    try {
+      const res = await fetch(
+        `http://localhost:5000/cats/${editing.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(editing),
+        }
+      );
 
-    setEditing(null);
-    loadCats();
+      if (!res.ok) throw new Error("Update failed");
+
+      setEditing(null);
+      loadCats();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update cat");
+    }
   };
 
   /* ================= DELETE ================= */
 
   const handleDelete = async (id: number) => {
-    await fetch(`http://localhost:5000/cats/${id}`, {
-      method: "DELETE",
-    });
+    if (!window.confirm("Delete this cat?")) return;
 
-    loadCats();
+    try {
+      await fetch(`http://localhost:5000/cats/${id}`, {
+        method: "DELETE",
+      });
+
+      loadCats();
+    } catch (err) {
+      console.error("Delete failed");
+    }
   };
+
+  /* ================= UI ================= */
 
   return (
     <div style={{ maxWidth: 1000, margin: "80px auto" }}>
       <h1 style={{ textAlign: "center", marginBottom: 30 }}>🐱 Cats</h1>
 
       <div style={{ textAlign: "center", marginBottom: 20 }}>
-        <button
-          onClick={() => setShowAdd(true)}
-          style={primaryBtn}
-        >
+        <button onClick={() => setShowAdd(true)} style={primaryBtn}>
           + Add Cat
         </button>
       </div>
 
-      {/* TABLE */}
+      {/* ================= TABLE ================= */}
+
       <table style={tableStyle}>
         <thead>
           <tr style={theadStyle}>
             <th style={th}>Name</th>
             <th style={th}>Age</th>
             <th style={th}>Breed</th>
+            <th style={th}>Status</th>
             <th style={th}>Actions</th>
           </tr>
         </thead>
@@ -140,15 +203,19 @@ export default function CatsList() {
               >
                 {cat.name}
               </td>
+
               <td style={{ padding: 12 }}>{cat.age}</td>
-              <td style={{ padding: 12 }}>{cat.breed}</td>
+              <td style={{ padding: 12 }}>{cat.breed?.name}</td>
+              <td style={{ padding: 12 }}>{cat.status}</td>
+
               <td style={{ padding: 12 }}>
                 <button
                   style={editBtn}
-                  onClick={() => setEditing({ ...cat })}
+                  onClick={() => setEditing(cat)}
                 >
                   Edit
                 </button>
+
                 <button
                   style={deleteBtn}
                   onClick={() => handleDelete(cat.id)}
@@ -162,26 +229,44 @@ export default function CatsList() {
       </table>
 
       {/* ================= ADD MODAL ================= */}
+
       {showAdd && (
         <Modal title="Add New Cat 🐱" onClose={() => setShowAdd(false)}>
           <input
             placeholder="Name"
             value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-          />
-          <input
-            placeholder="Age"
-            value={form.age}
-            onChange={(e) => setForm({ ...form, age: e.target.value })}
-          />
-          <input
-            placeholder="Breed"
-            value={form.breed}
-            onChange={(e) => setForm({ ...form, breed: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, name: e.target.value })
+            }
           />
 
+          <input
+            placeholder="Age"
+            type="number"
+            value={form.age}
+            onChange={(e) =>
+              setForm({ ...form, age: e.target.value })
+            }
+          />
+
+          <select
+            value={form.breedId}
+            onChange={(e) =>
+              setForm({ ...form, breedId: e.target.value })
+            }
+          >
+            <option value="">Select Breed</option>
+            {breeds.map((breed) => (
+              <option key={breed.id} value={breed.id}>
+                {breed.name}
+              </option>
+            ))}
+          </select>
+
           <button onClick={generateRealCat}>
-            {loadingImage ? "Loading kitten..." : "Generate Real Kitten 🐱"}
+            {loadingImage
+              ? "Loading kitten..."
+              : "Generate Real Kitten 🐱"}
           </button>
 
           {form.image && (
@@ -199,27 +284,27 @@ export default function CatsList() {
       )}
 
       {/* ================= EDIT MODAL ================= */}
+
       {editing && (
         <Modal title="Edit Cat 🐾" onClose={() => setEditing(null)}>
           <input
             value={editing.name}
             onChange={(e) =>
-              setEditing({ ...editing, name: e.target.value })
+              setEditing({
+                ...editing,
+                name: e.target.value,
+              })
             }
           />
+
           <input
+            type="number"
             value={editing.age}
             onChange={(e) =>
               setEditing({
                 ...editing,
                 age: Number(e.target.value),
               })
-            }
-          />
-          <input
-            value={editing.breed}
-            onChange={(e) =>
-              setEditing({ ...editing, breed: e.target.value })
             }
           />
 
@@ -245,7 +330,10 @@ function Modal({
 }) {
   return (
     <div onClick={onClose} style={overlay}>
-      <div onClick={(e) => e.stopPropagation()} style={modalStyle}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={modalStyle}
+      >
         <h2>{title}</h2>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {children}
