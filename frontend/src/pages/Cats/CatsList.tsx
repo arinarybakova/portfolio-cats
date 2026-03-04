@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import Slider from "@mui/material/Slider";
+import Typography from "@mui/material/Typography";
 
 /* ================= TYPES ================= */
 
@@ -46,6 +48,11 @@ export default function CatsList() {
     fromDate: "",
     toDate: "",
   });
+  const MIN = 1;
+  const MAX = 20;
+
+  const minAge = Number(filters.minAge ?? MIN);
+  const maxAge = Number(filters.maxAge ?? MAX);
 
   /* ================= PAGINATION ================= */
 
@@ -170,25 +177,52 @@ export default function CatsList() {
             onChange={(e) => setFilters({ ...filters, search: e.target.value })}
           />
 
-          <input
-            style={inputStyle}
-            type="number"
-            placeholder="Min Age"
-            value={filters.minAge}
-            onChange={(e) => setFilters({ ...filters, minAge: e.target.value })}
-          />
 
-          <input
-            style={inputStyle}
-            type="number"
-            placeholder="Max Age"
-            value={filters.maxAge}
-            onChange={(e) => setFilters({ ...filters, maxAge: e.target.value })}
-          />
+{/* AGE FROM */}
+<span>Age From: {minAge}</span>
+
+<Slider
+  min={MIN}
+  max={MAX}
+  value={minAge}
+  onChange={(_, value) => {
+    if (typeof value !== "number") return;
+
+    const newMin = value;
+    const adjustedMax = Math.max(newMin, maxAge); // 🔥 prevent invalid state
+
+    setFilters({
+      ...filters,
+      minAge: String(newMin),
+      maxAge: String(adjustedMax),
+    });
+  }}
+/>
+
+{/* AGE TO */}
+<span>Age To: {maxAge}</span>
+
+<Slider
+  min={MIN}
+  max={MAX}
+  value={maxAge}
+  onChange={(_, value) => {
+    if (typeof value !== "number") return;
+
+    const newMax = value;
+    const adjustedMin = Math.min(minAge, newMax); // 🔥 prevent invalid state
+
+    setFilters({
+      ...filters,
+      minAge: String(adjustedMin),
+      maxAge: String(newMax),
+    });
+  }}
+/>
 
           <select
             style={inputStyle}
-            value={filters.breedId}
+          value={filters.breedId}
             onChange={(e) =>
               setFilters({ ...filters, breedId: e.target.value })
             }
@@ -241,68 +275,74 @@ export default function CatsList() {
       </div>
 
       {/* ================= TABLE ================= */}
-<table style={tableStyle}>
-  <thead>
-    <tr>
-      <th style={thStyle}>Name</th>
-      <th style={thStyle}>Age</th>
-      <th style={thStyle}>Breed</th>
-      <th style={thStyle}>Status</th>
-      <th style={thStyle}>Image</th>
-      <th style={thStyle}>Actions</th>
-    </tr>
-  </thead>
-      <tbody>
-        {cats.length === 0 ? (
+      <table style={tableStyle}>
+        <thead>
           <tr>
-            <td colSpan={6} style={{ padding: 60 }}>
-              <div style={emptyState}>
-                🔍
-                <h2>No Cats Found</h2>
-                <p style={{ margin: 0, color: "#777" }}>
-                  Try adjusting your filters
-                </p>
-              </div>
-            </td>
+            <th style={thStyle}>Name</th>
+            <th style={thStyle}>Age</th>
+            <th style={thStyle}>Breed</th>
+            <th style={thStyle}>Status</th>
+            <th style={thStyle}>Image</th>
+            <th style={thStyle}>Actions</th>
           </tr>
-        ) : (
-          paginatedCats.map((cat) => (
-            <tr
-              key={cat.id}
-              className="table-row-hover"
-              style={{ textAlign: "center" }}
-            >
-              <td
-                style={clickableName}
-                onClick={() => navigate(`/cats/${cat.id}`)}
-              >
-                {cat.name}
-              </td>
-
-              <td>{cat.age}</td>
-              <td>{cat.breed?.name}</td>
-              <td>{cat.status}</td>
-
-              <td>
-                {cat.image && (
-                  <img src={cat.image} style={{ width: 60, borderRadius: 8 }} />
-                )}
-              </td>
-
-              <td>
-                <button style={primaryBtn} onClick={() => setEditing(cat)}>
-                  ✏ Edit
-                </button>
-
-                <button style={deleteBtn} onClick={() => handleDelete(cat.id)}>
-                  Delete
-                </button>
+        </thead>
+        <tbody>
+          {cats.length === 0 ? (
+            <tr>
+              <td colSpan={6} style={{ padding: 60 }}>
+                <div style={emptyState}>
+                  🔍
+                  <h2>No Cats Found</h2>
+                  <p style={{ margin: 0, color: "#777" }}>
+                    Try adjusting your filters
+                  </p>
+                </div>
               </td>
             </tr>
-          ))
-        )}
-      </tbody>
-</table>
+          ) : (
+            paginatedCats.map((cat) => (
+              <tr
+                key={cat.id}
+                className="table-row-hover"
+                style={{ textAlign: "center" }}
+              >
+                <td
+                  style={clickableName}
+                  onClick={() => navigate(`/cats/${cat.id}`)}
+                >
+                  {cat.name}
+                </td>
+
+                <td>{cat.age}</td>
+                <td>{cat.breed?.name}</td>
+                <td>{cat.status}</td>
+
+                <td>
+                  {cat.image && (
+                    <img
+                      src={cat.image}
+                      style={{ width: 60, borderRadius: 8 }}
+                    />
+                  )}
+                </td>
+
+                <td>
+                  <button style={primaryBtn} onClick={() => setEditing(cat)}>
+                    ✏ Edit
+                  </button>
+
+                  <button
+                    style={deleteBtn}
+                    onClick={() => handleDelete(cat.id)}
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
       {/* ================= PAGINATION ================= */}
 
       {cats.length > 0 && (
