@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 type User = { id: number; name: string; email: string; role: string };
 
@@ -9,50 +9,111 @@ export default function UsersList() {
     { id: 3, name: "Charlie", email: "charlie@test.com", role: "User" },
   ]);
 
-  const [newUser, setNewUser] = useState<User>({ id: 0, name: "", email: "", role: "User" });
+  useEffect(() => {
+  fetch("http://localhost:5000/users")
+    .then(res => res.json())
+    .then(data => setUsers(data))
+    .catch(err => console.error("Failed to fetch users", err));
+}, []);
+
+  const [newUser, setNewUser] = useState<User>({
+    id: 0,
+    name: "",
+    email: "",
+    role: "User",
+  });
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
   // Add new user
-  const handleAdd = () => {
-    if (!newUser.name || !newUser.email) return;
-    setUsers([...users, { ...newUser, id: users.length + 1 }]);
+  const handleAdd = async () => {
+  if (!newUser.name || !newUser.email) return;
+
+  try {
+    const res = await fetch("http://localhost:5000/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: newUser.name,
+        email: newUser.email,
+        password: "123456", // 👈 TEMP DEFAULT PASSWORD
+        role: newUser.role.toUpperCase(), // 👈 Important
+      }),
+    });
+
+    const createdUser = await res.json();
+    setUsers([...users, createdUser]);
+
     setNewUser({ id: 0, name: "", email: "", role: "User" });
-  };
+  } catch (err) {
+    console.error("Create failed", err);
+  }
+};
 
   // Delete user
-  const handleDelete = (id: number) => setUsers(users.filter(u => u.id !== id));
+  const handleDelete = (id: number) =>
+    setUsers(users.filter((u) => u.id !== id));
 
   // Save edited user
   const handleSaveEdit = () => {
     if (!editingUser) return;
-    setUsers(users.map(u => (u.id === editingUser.id ? editingUser : u)));
+    setUsers(users.map((u) => (u.id === editingUser.id ? editingUser : u)));
     setEditingUser(null);
   };
 
   return (
-    <div style={{ maxWidth: "900px", margin: "100px auto 40px auto", fontFamily: "Arial, sans-serif" }}>
-      <h1 style={{ textAlign: "center", marginBottom: "30px", color: "#333" }}>Users List</h1>
+    <div
+      style={{
+        maxWidth: "900px",
+        margin: "100px auto 40px auto",
+        fontFamily: "Arial, sans-serif",
+      }}
+    >
+      <h1 style={{ textAlign: "center", marginBottom: "30px", color: "#333" }}>
+        Users List
+      </h1>
 
       {/* Add new user */}
-      <div style={{ display: "flex", justifyContent: "center", gap: "10px", marginBottom: "25px" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: "10px",
+          marginBottom: "25px",
+        }}
+      >
         <input
           type="text"
           placeholder="Name"
           value={newUser.name}
-          onChange={e => setNewUser({ ...newUser, name: e.target.value })}
-          style={{ padding: "10px", borderRadius: "8px", border: "1px solid #ccc", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}
+          onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+          style={{
+            padding: "10px",
+            borderRadius: "8px",
+            border: "1px solid #ccc",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+          }}
         />
         <input
           type="email"
           placeholder="Email"
           value={newUser.email}
-          onChange={e => setNewUser({ ...newUser, email: e.target.value })}
-          style={{ padding: "10px", borderRadius: "8px", border: "1px solid #ccc", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}
+          onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+          style={{
+            padding: "10px",
+            borderRadius: "8px",
+            border: "1px solid #ccc",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+          }}
         />
         <select
           value={newUser.role}
-          onChange={e => setNewUser({ ...newUser, role: e.target.value })}
-          style={{ padding: "10px", borderRadius: "8px", border: "1px solid #ccc", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}
+          onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+          style={{
+            padding: "10px",
+            borderRadius: "8px",
+            border: "1px solid #ccc",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+          }}
         >
           <option>User</option>
           <option>Admin</option>
@@ -67,7 +128,7 @@ export default function UsersList() {
             color: "white",
             cursor: "pointer",
             fontWeight: "bold",
-            boxShadow: "0 3px 6px rgba(0,0,0,0.15)"
+            boxShadow: "0 3px 6px rgba(0,0,0,0.15)",
           }}
         >
           Add
@@ -75,9 +136,23 @@ export default function UsersList() {
       </div>
 
       {/* Users Table */}
-      <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, borderRadius: "12px", overflow: "hidden", boxShadow: "0 4px 15px rgba(0,0,0,0.1)" }}>
+      <table
+        style={{
+          width: "100%",
+          borderCollapse: "separate",
+          borderSpacing: 0,
+          borderRadius: "12px",
+          overflow: "hidden",
+          boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
+        }}
+      >
         <thead>
-          <tr style={{ background: "linear-gradient(90deg, #6a11cb, #2575fc)", color: "white" }}>
+          <tr
+            style={{
+              background: "linear-gradient(90deg, #6a11cb, #2575fc)",
+              color: "white",
+            }}
+          >
             <th style={{ padding: "15px" }}>ID</th>
             <th style={{ padding: "15px" }}>Name</th>
             <th style={{ padding: "15px" }}>Email</th>
@@ -92,16 +167,28 @@ export default function UsersList() {
               style={{
                 backgroundColor: index % 2 === 0 ? "#f9f9f9" : "#fff",
                 transition: "0.3s",
-                textAlign: "center"
+                textAlign: "center",
               }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#e0f7fa")}
-              onMouseLeave={e => (e.currentTarget.style.backgroundColor = index % 2 === 0 ? "#f9f9f9" : "#fff")}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = "#e0f7fa")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor =
+                  index % 2 === 0 ? "#f9f9f9" : "#fff")
+              }
             >
               <td style={{ padding: "12px" }}>{u.id}</td>
               <td style={{ padding: "12px" }}>{u.name}</td>
               <td style={{ padding: "12px" }}>{u.email}</td>
               <td style={{ padding: "12px" }}>{u.role}</td>
-              <td style={{ padding: "12px", display: "flex", justifyContent: "center", gap: "8px" }}>
+              <td
+                style={{
+                  padding: "12px",
+                  display: "flex",
+                  justifyContent: "center",
+                  gap: "8px",
+                }}
+              >
                 <button
                   onClick={() => setEditingUser(u)}
                   style={{
@@ -111,7 +198,7 @@ export default function UsersList() {
                     backgroundColor: "#ff9800",
                     color: "white",
                     cursor: "pointer",
-                    fontWeight: "bold"
+                    fontWeight: "bold",
                   }}
                 >
                   Edit
@@ -125,7 +212,7 @@ export default function UsersList() {
                     backgroundColor: "#f44336",
                     color: "white",
                     cursor: "pointer",
-                    fontWeight: "bold"
+                    fontWeight: "bold",
                   }}
                 >
                   Delete
@@ -141,46 +228,99 @@ export default function UsersList() {
         <div
           style={{
             position: "fixed",
-            top: 0, left: 0, right: 0, bottom: 0,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
             backgroundColor: "rgba(0,0,0,0.5)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 200
+            zIndex: 200,
           }}
         >
-          <div style={{ backgroundColor: "white", padding: "30px", borderRadius: "12px", minWidth: "300px" }}>
+          <div
+            style={{
+              backgroundColor: "white",
+              padding: "30px",
+              borderRadius: "12px",
+              minWidth: "300px",
+            }}
+          >
             <h2 style={{ marginTop: 0 }}>Edit User</h2>
             <input
               type="text"
               value={editingUser.name}
-              onChange={e => setEditingUser({ ...editingUser, name: e.target.value })}
-              style={{ padding: "8px", width: "100%", marginBottom: "10px", borderRadius: "6px", border: "1px solid #ccc" }}
+              onChange={(e) =>
+                setEditingUser({ ...editingUser, name: e.target.value })
+              }
+              style={{
+                padding: "8px",
+                width: "100%",
+                marginBottom: "10px",
+                borderRadius: "6px",
+                border: "1px solid #ccc",
+              }}
             />
             <input
               type="email"
               value={editingUser.email}
-              onChange={e => setEditingUser({ ...editingUser, email: e.target.value })}
-              style={{ padding: "8px", width: "100%", marginBottom: "10px", borderRadius: "6px", border: "1px solid #ccc" }}
+              onChange={(e) =>
+                setEditingUser({ ...editingUser, email: e.target.value })
+              }
+              style={{
+                padding: "8px",
+                width: "100%",
+                marginBottom: "10px",
+                borderRadius: "6px",
+                border: "1px solid #ccc",
+              }}
             />
             <select
               value={editingUser.role}
-              onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}
-              style={{ padding: "8px", width: "100%", marginBottom: "20px", borderRadius: "6px", border: "1px solid #ccc" }}
+              onChange={(e) =>
+                setEditingUser({ ...editingUser, role: e.target.value })
+              }
+              style={{
+                padding: "8px",
+                width: "100%",
+                marginBottom: "20px",
+                borderRadius: "6px",
+                border: "1px solid #ccc",
+              }}
             >
               <option>User</option>
               <option>Admin</option>
             </select>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "10px",
+              }}
+            >
               <button
                 onClick={() => setEditingUser(null)}
-                style={{ padding: "8px 12px", borderRadius: "6px", border: "none", backgroundColor: "#ccc", cursor: "pointer" }}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: "6px",
+                  border: "none",
+                  backgroundColor: "#ccc",
+                  cursor: "pointer",
+                }}
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveEdit}
-                style={{ padding: "8px 12px", borderRadius: "6px", border: "none", backgroundColor: "#4CAF50", color: "white", cursor: "pointer" }}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: "6px",
+                  border: "none",
+                  backgroundColor: "#4CAF50",
+                  color: "white",
+                  cursor: "pointer",
+                }}
               >
                 Save
               </button>

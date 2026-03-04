@@ -23,24 +23,39 @@ export default function CatDetails() {
 
   const [cat, setCat] = useState<Cat | null>(null);
   const [formData, setFormData] = useState<Cat | null>(null);
+  const [users, setUsers] = useState<any[]>([]);
   const [ownerId, setOwnerId] = useState<number | "">("");
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  /* ================= FETCH CAT ================= */
+
+  const fetchCat = async () => {
+    try {
+      const res = await fetch(`http://localhost:5000/cats/${id}`);
+      const data = await res.json();
+      setCat(data);
+      setFormData(data);
+      setLoading(false);
+    } catch (err) {
+      console.error(err);
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetch(`http://localhost:5000/cats/${id}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setCat(data);
-        setFormData(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
+    fetchCat();
   }, [id]);
+
+  /* ================= FETCH USERS ================= */
+
+  useEffect(() => {
+    fetch("http://localhost:5000/users")
+      .then((res) => res.json())
+      .then((data) => setUsers(data))
+      .catch((err) => console.error("Failed to fetch users", err));
+  }, []);
 
   if (loading) {
     return (
@@ -52,28 +67,24 @@ export default function CatDetails() {
 
   if (!cat || !formData) return null;
 
-  /* ================= ACTIONS ================= */
+  /* ================= SAVE CAT ================= */
 
   const handleSave = async () => {
     try {
       setSaving(true);
 
-      const res = await fetch(
-        `http://localhost:5000/cats/${cat.id}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: formData.name,
-            age: formData.age,
-            status: formData.status,
-            image: formData.image,
-          }),
-        }
-      );
+      const res = await fetch(`http://localhost:5000/cats/${cat.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          age: formData.age,
+          status: formData.status,
+          image: formData.image,
+        }),
+      });
 
       const updated = await res.json();
-
       setCat(updated);
       setFormData(updated);
       setIsEditing(false);
@@ -89,67 +100,22 @@ export default function CatDetails() {
     setIsEditing(false);
   };
 
-  const handleImageUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    if (!e.target.files) return;
+  /* ================= ASSIGN OWNER ================= */
 
-    const file = e.target.files[0];
-    const form = new FormData();
-    form.append("image", file);
-
-    const res = await fetch(
-      `http://localhost:5000/cats/${cat.id}/upload`,
-      {
-        method: "POST",
-        body: form,
-      }
-    );
-
-    const data = await res.json();
-
-    setFormData({ ...formData, image: data.image });
-  };
-
-  /* ✅ FIXED AI IMAGE FUNCTION */
-  const generateAIImage = async () => {
-    try {
-      const res = await fetch(
-        `http://localhost:5000/cats/${cat.id}/generate-image`,
-        { method: "POST" }
-      );
-
-      if (!res.ok) throw new Error("AI generation failed");
-
-      const data = await res.json();
-
-      const newImage = data.image || data.updatedCat?.image;
-
-      if (newImage) {
-        setFormData({ ...formData, image: newImage });
-      }
-    } catch (err) {
-      console.error(err);
-      alert("AI image generation failed");
-    }
-  };
-
-  /* ✅ ASSIGN OWNER */
   const assignOwner = async () => {
+    if (!ownerId) return;
+
     try {
       const res = await fetch(
         `http://localhost:5000/cats/${cat.id}/assign-owner`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ownerId }),
-        }
+        },
       );
 
       const updated = await res.json();
-
       setCat(updated);
       setFormData(updated);
       setOwnerId("");
@@ -158,10 +124,28 @@ export default function CatDetails() {
     }
   };
 
-  /* ✅ DELETE CAT */
+  /* ================= REMOVE OWNER ================= */
+
+  const removeOwner = async () => {
+    try {
+      const res = await fetch(
+        `http://localhost:5000/cats/${cat.id}/remove-owner`,
+        { method: "POST" },
+      );
+
+      const updated = await res.json();
+      setCat(updated);
+      setFormData(updated);
+    } catch (err) {
+      console.error("Remove owner failed", err);
+    }
+  };
+
+  /* ================= DELETE CAT ================= */
+
   const deleteCat = async () => {
     const confirmDelete = window.confirm(
-      "Are you sure you want to delete this cat?"
+      "Are you sure you want to delete this cat?",
     );
 
     if (!confirmDelete) return;
@@ -212,17 +196,13 @@ export default function CatDetails() {
         <div
           style={{
             height: 180,
-            background:
-              "linear-gradient(135deg,#667eea,#764ba2,#6B73FF)",
+            background: "linear-gradient(135deg,#667eea,#764ba2,#6B73FF)",
           }}
         />
 
         <div style={{ textAlign: "center", padding: 40 }}>
           <img
-            src={
-              formData.image ||
-              "https://via.placeholder.com/200"
-            }
+            src={formData.image || "https://via.placeholder.com/200"}
             alt={formData.name}
             style={{
               width: 220,
@@ -235,7 +215,8 @@ export default function CatDetails() {
             }}
           />
 
-          {/* EDIT MODE */}
+          {/* ================= EDIT MODE ================= */}
+
           {isEditing ? (
             <div
               style={{
@@ -249,10 +230,7 @@ export default function CatDetails() {
                 style={inputStyle}
                 value={formData.name}
                 onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    name: e.target.value,
-                  })
+                  setFormData({ ...formData, name: e.target.value })
                 }
               />
 
@@ -283,31 +261,48 @@ export default function CatDetails() {
                 <option value="PENDING">Pending</option>
               </select>
 
-              <input type="file" onChange={handleImageUpload} />
+              {/* IMAGE */}
+              <input type="file" />
 
-              <button style={secondaryButton} onClick={generateAIImage}>
-                🤖 Generate AI Image
-              </button>
+              {/* ================= OWNER SECTION ================= */}
 
-              <input
-                style={inputStyle}
-                type="number"
-                placeholder="Owner ID"
-                value={ownerId}
-                onChange={(e) =>
-                  setOwnerId(Number(e.target.value))
-                }
-              />
+              {/* ✅ SHOW DROPDOWN ONLY IF NO OWNER */}
+              {!cat.owner && (
+                <>
+                  <select
+                    style={inputStyle}
+                    value={ownerId}
+                    onChange={(e) => setOwnerId(Number(e.target.value))}
+                  >
+                    <option value="">Select Owner</option>
 
-              <button style={secondaryButton} onClick={assignOwner}>
-                👤 Assign Owner
-              </button>
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    style={secondaryButton}
+                    onClick={assignOwner}
+                    disabled={!ownerId}
+                  >
+                    👤 Assign Owner
+                  </button>
+                </>
+              )}
+
+              {/* ✅ SHOW REMOVE ONLY IF OWNER EXISTS */}
+              {cat.owner && (
+                <button style={dangerButton} onClick={removeOwner}>
+                  ❌ Remove Owner
+                </button>
+              )}
             </div>
           ) : (
             <>
-              <h1 style={{ marginTop: 30, fontSize: 32 }}>
-                {cat.name}
-              </h1>
+              <h1 style={{ marginTop: 30, fontSize: 32 }}>{cat.name}</h1>
               <p>🐾 Age: {cat.age}</p>
               <p>🧬 Breed: {cat.breed.name}</p>
               <p>📌 Status: {cat.status}</p>
@@ -316,7 +311,8 @@ export default function CatDetails() {
           )}
         </div>
 
-        {/* BUTTONS */}
+        {/* ================= ACTION BUTTONS ================= */}
+
         <div style={{ textAlign: "center", marginBottom: 40 }}>
           {isEditing ? (
             <>
@@ -334,10 +330,7 @@ export default function CatDetails() {
             </>
           ) : (
             <>
-              <button
-                style={primaryButton}
-                onClick={() => setIsEditing(true)}
-              >
+              <button style={primaryButton} onClick={() => setIsEditing(true)}>
                 ✏️ Edit
               </button>
 

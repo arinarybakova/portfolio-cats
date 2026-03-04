@@ -23,7 +23,7 @@ app.get("/test", (req, res) => {
 
 app.get("/users", async (req, res) => {
   try {
-    const users = await prisma.user.findMany();
+    const users = await prisma.user.findMany({include: { cats: true }});
     res.json(users);
   } catch (error) {
     console.error("GET /users error:", error);
@@ -33,14 +33,21 @@ app.get("/users", async (req, res) => {
 
 app.post("/users", async (req, res) => {
   try {
+    const { name, email, password, role } = req.body;
+
     const user = await prisma.user.create({
-      data: req.body,
+      data: {
+        name,
+        email,
+        password,
+        role,
+      },
     });
 
     res.status(201).json(user);
-  } catch (error) {
-    console.error("POST /users error:", error);
-    res.status(500).json({ error: "Failed to create user" });
+  } catch (error: any) {
+    console.error(error);
+    res.status(400).json({ error: error.message });
   }
 });
 
@@ -178,7 +185,7 @@ console.log("QUERY RECEIVED:", req.query);
 
     const cats = await prisma.cat.findMany({
       where,
-      include: { breed: true },
+      include: { breed: true, owner: true },
       orderBy: {
         createdAt: "desc",
       },
@@ -207,7 +214,7 @@ app.get("/cats/:id", async (req, res) => {
 
     const cat = await prisma.cat.findUnique({
       where: { id },
-      include: { breed: true },
+      include: { breed: true, owner: true },
     });
 
     if (!cat) {
@@ -241,7 +248,7 @@ app.post("/cats", async (req, res) => {
           },
         },
       },
-      include: { breed: true },
+      include: { breed: true, owner: true },
     });
 
     res.status(201).json(newCat);
@@ -275,13 +282,62 @@ app.put("/cats/:id", async (req, res) => {
           },
         }),
       },
-      include: { breed: true },
+      include: { breed: true, owner: true },
     });
 
     res.json(updatedCat);
   } catch (error) {
     console.error("PUT /cats error:", error);
     res.status(500).json({ error: "Failed to update cat" });
+  }
+});
+
+app.post("/cats/:id/assign-owner", async (req, res) => {
+  try {
+    const catId = Number(req.params.id);
+    const { ownerId } = req.body;
+
+    if (!ownerId) {
+      return res.status(400).json({ error: "ownerId is required" });
+    }
+
+    const updatedCat = await prisma.cat.update({
+      where: { id: catId },
+      data: {
+        ownerId: Number(ownerId),
+        status: "ADOPTED",
+      },
+      include: { breed: true, owner: true },
+    });
+
+    res.json(updatedCat);
+  } catch (error) {
+    console.error("Assign owner error:", error);
+    res.status(500).json({ error: "Failed to assign owner" });
+  }
+});
+
+/* =======================================================
+   REMOVE OWNER
+======================================================= */
+
+app.post("/cats/:id/remove-owner", async (req, res) => {
+  try {
+    const catId = Number(req.params.id);
+
+    const updatedCat = await prisma.cat.update({
+      where: { id: catId },
+      data: {
+        ownerId: null,
+        status: "AVAILABLE",
+      },
+      include: { breed: true, owner: true },
+    });
+
+    res.json(updatedCat);
+  } catch (error) {
+    console.error("Remove owner error:", error);
+    res.status(500).json({ error: "Failed to remove owner" });
   }
 });
 
