@@ -58,6 +58,16 @@ export default function Navbar() {
         >
           Cats
         </Link>
+        <Link
+          to="/puzzle"
+          style={{
+            color: "white",
+            textDecoration: "none",
+            fontWeight: "bold",
+          }}
+        >
+          Puzzle
+        </Link>
       </div>
     </nav>
   );

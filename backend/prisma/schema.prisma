@@ -39,6 +39,7 @@ model Cat {
   @@index([breedId])
   ownerId Int?        // one owner only
   owner   User? @relation(fields: [ownerId], references: [id])
+   priority  Boolean  @default(false)
 }
 
 model Breed {

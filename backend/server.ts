@@ -17,6 +17,16 @@ app.get("/test", (req, res) => {
   res.json({ message: "test works" });
 });
 
+function parseBoolean(value: any): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase();
+    if (v === "true") return true;
+    if (v === "false") return false;
+  }
+  return undefined; // means "not provided"
+}
+
 /* =======================================================
    USERS
 ======================================================= */
@@ -235,6 +245,7 @@ app.get("/cats/:id", async (req, res) => {
 app.post("/cats", async (req, res) => {
   try {
     const { name, age, image, status, breedId } = req.body;
+    const priority = parseBoolean(req.body?.priority) ?? false;
 
     const newCat = await prisma.cat.create({
       data: {
@@ -242,6 +253,7 @@ app.post("/cats", async (req, res) => {
         age: Number(age),
         image,
         status: status || "AVAILABLE",
+        priority: Boolean(priority) || false,
         breed: {
           connect: {
             id: Number(breedId),
@@ -265,7 +277,22 @@ app.post("/cats", async (req, res) => {
 app.put("/cats/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
+
+    // ✅ Log what backend receives
+    console.log("PUT /cats/:id body:", req.body);
+
     const { name, age, image, status, breedId } = req.body;
+
+    // ✅ IMPORTANT: declare + parse priority properly
+    const priorityRaw = req.body?.priority;
+    const priority =
+      typeof priorityRaw === "boolean"
+        ? priorityRaw
+        : typeof priorityRaw === "string"
+          ? priorityRaw.toLowerCase() === "true"
+          : undefined;
+
+    console.log("Parsed priority:", priority);
 
     const updatedCat = await prisma.cat.update({
       where: { id },
@@ -274,16 +301,18 @@ app.put("/cats/:id", async (req, res) => {
         age: Number(age),
         image,
         status,
+
+        // ✅ THIS is the actual write
+        ...(priority !== undefined ? { priority } : {}),
+
         ...(breedId && {
-          breed: {
-            connect: {
-              id: Number(breedId),
-            },
-          },
+          breed: { connect: { id: Number(breedId) } },
         }),
       },
       include: { breed: true, owner: true },
     });
+
+    console.log("Updated cat returned:", updatedCat);
 
     res.json(updatedCat);
   } catch (error) {

@@ -4,6 +4,8 @@ import Login from "../pages/Login/Login";
 import UsersList from "../pages/Users/UsersList";
 import CatsList from "../pages/Cats/CatsList";
 import CatDetails from "../pages/Cats/CatDetails"
+import Puzzle from "../pages/Puzzle/Puzzle"
+import UserDetails from "../pages/Users/UserDetails"
 
 
 export default function AppRoutes() {
@@ -14,6 +16,9 @@ export default function AppRoutes() {
       <Route path="/users" element={<UsersList />} />
       <Route path="/cats" element={<CatsList />} />
       <Route path="/cats/:id" element={<CatDetails />} />
+      <Route path="/puzzle" element={<Puzzle/>} />
+      <Route path="/users/:id" element={<UserDetails />} />
+
     </Routes>
   );
 }
