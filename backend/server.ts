@@ -56,6 +56,7 @@ function getJwtSecret(): string {
 
 const JWT_SECRET = getJwtSecret();
 
+
 function authMiddleware(req: AuthRequest, res: express.Response, next: express.NextFunction) {
   try {
     const authHeader = req.headers.authorization;
@@ -249,8 +250,32 @@ app.get("/auth/me", authMiddleware, async (req: AuthRequest, res) => {
 /* =======================================================
    USERS
 ======================================================= */
+app.get("/me", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      include: {
+        cats: {
+          include: {
+            breed: true,
+          },
+        },
+      },
+    });
 
-app.get("/users", async (req, res) => {
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const { password, ...safeUser } = user;
+    res.json(safeUser);
+  } catch (error) {
+    console.error("GET /me error:", error);
+    res.status(500).json({ error: "Failed to fetch current user" });
+  }
+});
+
+app.get("/users", authMiddleware, requireAdmin, async (req, res) => {
   try {
     const users = await prisma.user.findMany({
       include: { cats: true },
@@ -287,13 +312,23 @@ app.post("/users", async (req, res) => {
   }
 });
 
-app.get("/users/:id", async (req, res) => {
+app.get("/users/:id", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const id = Number(req.params.id);
 
+    if (String(req.user?.role).toUpperCase() !== "ADMIN" && req.user?.id !== id) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
     const user = await prisma.user.findUnique({
       where: { id },
-      include: { cats: true },
+      include: {
+        cats: {
+          include: {
+            breed: true,
+          },
+        },
+      },
     });
 
     if (!user) {
@@ -308,10 +343,19 @@ app.get("/users/:id", async (req, res) => {
   }
 });
 
-app.put("/users/:id", async (req, res) => {
+app.put("/users/:id", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const id = Number(req.params.id);
+
+    if (String(req.user?.role).toUpperCase() !== "ADMIN" && req.user?.id !== id) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
     const data = { ...req.body };
+
+    if (String(req.user?.role).toUpperCase() !== "ADMIN") {
+      delete data.role;
+    }
 
     if (data.password) {
       data.password = await bcrypt.hash(String(data.password), 10);
@@ -333,12 +377,12 @@ app.put("/users/:id", async (req, res) => {
     const { password, ...safeUser } = user;
     res.json(safeUser);
   } catch (error) {
-    console.error("PUT /users error:", error);
+    console.error("PUT /users/:id error:", error);
     res.status(500).json({ error: "Failed to update user" });
   }
 });
 
-app.delete("/users/:id", async (req, res) => {
+app.delete("/users/:id", authMiddleware, requireAdmin, async (req, res) => {
   try {
     const id = Number(req.params.id);
 
@@ -357,7 +401,7 @@ app.delete("/users/:id", async (req, res) => {
    BREEDS
 ======================================================= */
 
-app.get("/breeds", async (req, res) => {
+app.get("/cats", authMiddleware, requireAdmin, async (req, res) => {
   try {
     const breeds = await prisma.breed.findMany();
     res.json(breeds);
@@ -371,7 +415,7 @@ app.get("/breeds", async (req, res) => {
    CATS WITH FIXED FILTERING
 ======================================================= */
 
-app.get("/cats", async (req, res) => {
+app.get("/cats", authMiddleware, requireAdmin, async (req, res) => {
   console.log("🔥 CATS ROUTE HIT");
 console.log("QUERY RECEIVED:", req.query);
   try {
@@ -474,12 +518,32 @@ console.log("QUERY RECEIVED:", req.query);
     });
   }
 });
+app.get("/my/cats", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const cats = await prisma.cat.findMany({
+      where: {
+        ownerId: req.user!.id,
+      },
+      include: {
+        breed: true,
+        owner: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
 
+    res.json(cats);
+  } catch (error) {
+    console.error("GET /my/cats error:", error);
+    res.status(500).json({ error: "Failed to fetch user cats" });
+  }
+});
 /* =======================================================
    SINGLE CAT
 ======================================================= */
 
-app.get("/cats/:id", async (req, res) => {
+app.get("/cats/:id", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const id = Number(req.params.id);
 
@@ -492,19 +556,25 @@ app.get("/cats/:id", async (req, res) => {
       return res.status(404).json({ message: "Cat not found" });
     }
 
+    const isAdmin = String(req.user?.role).toUpperCase() === "ADMIN";
+    const isOwner = cat.ownerId === req.user?.id;
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
     res.json(cat);
   } catch (error) {
     console.error("GET /cats/:id error:", error);
     res.status(500).json({ error: "Failed to fetch cat" });
   }
 });
-
 /* =======================================================
    CREATE CAT
 ======================================================= */
 
-app.post("/cats", async (req, res) => {
-  try {
+app.post("/cats", authMiddleware, requireAdmin, async (req, res) => {
+    try {
     const { name, age, image, status, breedId } = req.body;
     const priority = parseBoolean(req.body?.priority) ?? false;
 
@@ -535,7 +605,7 @@ app.post("/cats", async (req, res) => {
    UPDATE CAT
 ======================================================= */
 
-app.put("/cats/:id", async (req, res) => {
+app.put("/cats/:id", authMiddleware, requireAdmin, async (req, res) => {
   try {
     const id = Number(req.params.id);
 
@@ -582,7 +652,7 @@ app.put("/cats/:id", async (req, res) => {
   }
 });
 
-app.post("/cats/:id/assign-owner", async (req, res) => {
+app.post("/cats/:id/assign-owner", authMiddleware, requireAdmin, async (req, res) => {
   try {
     const catId = Number(req.params.id);
     const { ownerId } = req.body;
@@ -611,7 +681,7 @@ app.post("/cats/:id/assign-owner", async (req, res) => {
    REMOVE OWNER
 ======================================================= */
 
-app.post("/cats/:id/remove-owner", async (req, res) => {
+app.post("/cats/:id/remove-owner", authMiddleware, requireAdmin, async (req, res) => {
   try {
     const catId = Number(req.params.id);
 
@@ -650,7 +720,7 @@ app.delete("/cats/:id", async (req, res) => {
   }
 });
 
-app.get("/dashboard/stats", async (req, res) => {
+app.get("/dashboard/stats", authMiddleware, requireAdmin, async (req, res) => {
   try {
     const [
       totalCats,
