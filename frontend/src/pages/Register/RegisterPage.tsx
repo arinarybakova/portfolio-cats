@@ -33,19 +33,7 @@ const styles = `
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    min-height: 680px;
-    position: relative;
-    overflow: hidden;
-  }
-  .hero-panel::before {
-    content: "";
-    position: absolute;
-    inset: auto -80px -80px auto;
-    width: 260px;
-    height: 260px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(245,158,11,0.30), transparent 68%);
-    pointer-events: none;
+    min-height: 700px;
   }
   .hero-badge {
     display: inline-flex;
@@ -76,36 +64,12 @@ const styles = `
     line-height: 1.7;
     color: #dbe4f2;
   }
-  .hero-stats {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
-    margin-top: 24px;
-  }
-  .stat-card {
-    padding: 14px;
-    border-radius: 18px;
-    border: 1px solid rgba(255,255,255,0.08);
-    background: rgba(255,255,255,0.04);
-  }
-  .stat-label {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: #cbd5e1;
-    font-weight: 700;
-    margin-bottom: 8px;
-  }
-  .stat-value {
-    font-size: 22px;
-    font-weight: 900;
-  }
-  .feature-list {
+  .hero-grid {
     display: grid;
     gap: 12px;
     margin-top: 26px;
   }
-  .feature-item {
+  .hero-card {
     padding: 14px 16px;
     border-radius: 18px;
     background: rgba(255,255,255,0.04);
@@ -117,9 +81,6 @@ const styles = `
     display: flex;
     flex-direction: column;
     justify-content: center;
-  }
-  .form-card {
-    padding: 10px;
   }
   .form-badge {
     display: inline-flex;
@@ -205,10 +166,6 @@ const styles = `
     font-weight: 800;
     border-radius: 16px;
     padding: 14px 16px;
-    transition: opacity .15s ease;
-  }
-  .btn:hover, .btn-outline:hover {
-    opacity: 0.96;
   }
   .btn {
     color: white;
@@ -244,34 +201,33 @@ const styles = `
       border-radius: 22px;
       padding: 18px;
     }
-    .hero-stats {
-      grid-template-columns: 1fr;
-    }
   }
 `;
 
 type AccountType = "USER" | "ADMIN";
 
-export default function Login() {
+export default function Register() {
   const navigate = useNavigate();
   const [role, setRole] = useState<AccountType>("USER");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:5000/auth/login", {
+      const res = await fetch("http://localhost:5000/auth/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          name,
           email,
           password,
           role,
@@ -281,7 +237,7 @@ export default function Login() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data?.error || "Login failed");
+        throw new Error(data?.error || "Registration failed");
       }
 
       localStorage.setItem("token", data.token);
@@ -293,7 +249,7 @@ export default function Login() {
         navigate("/cats");
       }
     } catch (err: any) {
-      setError(err.message || "Login failed");
+      setError(err.message || "Registration failed");
     } finally {
       setLoading(false);
     }
@@ -306,41 +262,26 @@ export default function Login() {
         <div className="auth-shell">
           <div className="hero-panel">
             <div>
-              <div className="hero-badge">Premium Cat Shelter Access</div>
-              <h1 className="hero-title">Welcome back to your adoption hub.</h1>
+              <div className="hero-badge">Create Premium Access</div>
+              <h1 className="hero-title">Join the shelter platform in style.</h1>
               <p className="hero-subtitle">
-                Log in as a user or admin and continue managing cats, owners, breeds, and dashboard insights in one premium workspace.
+                Register a new user or admin account and start managing cats, owners, analytics, and platform activity.
               </p>
-
-              <div className="hero-stats">
-                <div className="stat-card">
-                  <div className="stat-label">Accounts</div>
-                  <div className="stat-value">User + Admin</div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-label">Security</div>
-                  <div className="stat-value">JWT Auth</div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-label">Access</div>
-                  <div className="stat-value">Role Based</div>
-                </div>
-              </div>
             </div>
 
-            <div className="feature-list">
-              <div className="feature-item">Track cats, breeds, owners, and adoptions in a single polished admin system.</div>
-              <div className="feature-item">Switch cleanly between user and admin account types from the login experience.</div>
-              <div className="feature-item">Designed for real flows and future Playwright end-to-end coverage.</div>
+            <div className="hero-grid">
+              <div className="hero-card">Create user accounts for adoption flows and profile management.</div>
+              <div className="hero-card">Create admin accounts for dashboard insights and full system control.</div>
+              <div className="hero-card">Same premium UI language as the rest of the platform for a polished experience.</div>
             </div>
           </div>
 
           <div className="form-panel">
-            <div className="form-card">
-              <div className="form-badge">Sign In</div>
-              <h2 className="form-title">Login</h2>
+            <div>
+              <div className="form-badge">Create Account</div>
+              <h2 className="form-title">Register</h2>
               <p className="form-subtitle">
-                Choose your account type and enter your credentials to continue.
+                Pick the account type, fill in your details, and create access instantly.
               </p>
 
               <div className="tabs">
@@ -360,7 +301,19 @@ export default function Login() {
                 </button>
               </div>
 
-              <form className="stack" onSubmit={handleLogin}>
+              <form className="stack" onSubmit={handleRegister}>
+                <div className="field">
+                  <label>Name</label>
+                  <input
+                    className="input"
+                    type="text"
+                    placeholder="Your full name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    data-testid="register-name"
+                  />
+                </div>
+
                 <div className="field">
                   <label>Email</label>
                   <input
@@ -369,7 +322,7 @@ export default function Login() {
                     placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    data-testid="login-email"
+                    data-testid="register-email"
                   />
                 </div>
 
@@ -378,17 +331,17 @@ export default function Login() {
                   <input
                     className="input"
                     type="password"
-                    placeholder="Enter your password"
+                    placeholder="Create a password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    data-testid="login-password"
+                    data-testid="register-password"
                   />
                 </div>
 
                 {error ? <div className="error-box">{error}</div> : null}
 
-                <button className="btn" type="submit" disabled={loading} data-testid="login-submit">
-                  {loading ? "Signing In..." : `Login as ${role === "ADMIN" ? "Admin" : "User"}`}
+                <button className="btn" type="submit" disabled={loading} data-testid="register-submit">
+                  {loading ? "Creating Account..." : `Register as ${role === "ADMIN" ? "Admin" : "User"}`}
                 </button>
 
                 <button type="button" className="btn-outline" onClick={() => navigate("/")}>
@@ -397,7 +350,7 @@ export default function Login() {
               </form>
 
               <div className="bottom-note">
-                Don’t have an account? <Link to="/register">Create one here</Link>
+                Already have an account? <Link to="/login">Go to login</Link>
               </div>
             </div>
           </div>

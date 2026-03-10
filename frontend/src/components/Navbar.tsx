@@ -38,6 +38,16 @@ export default function Navbar() {
         </Link>
 
         <Link
+          to="/dashboard"
+          style={{
+            color: "white",
+            textDecoration: "none",
+            fontWeight: "bold",
+          }}
+        >
+          Dashboard
+        </Link>
+        <Link
           to="/users"
           style={{
             color: "white",

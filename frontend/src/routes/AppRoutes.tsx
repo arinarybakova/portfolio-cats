@@ -6,6 +6,8 @@ import CatsList from "../pages/Cats/CatsList";
 import CatDetails from "../pages/Cats/CatDetails"
 import Puzzle from "../pages/Puzzle/Puzzle"
 import UserDetails from "../pages/Users/UserDetails"
+import Dashboard from "../pages/Dashboard/DashboardPage"
+import Register from "../pages/Register/RegisterPage";
 
 
 export default function AppRoutes() {
@@ -18,7 +20,8 @@ export default function AppRoutes() {
       <Route path="/cats/:id" element={<CatDetails />} />
       <Route path="/puzzle" element={<Puzzle/>} />
       <Route path="/users/:id" element={<UserDetails />} />
-
+      <Route path="/dashboard" element={<Dashboard/>} />
+      <Route path="/register" element={<Register />} />
     </Routes>
   );
 }
