@@ -7,7 +7,7 @@ function App() {
   return (
     <BrowserRouter>
       <Navbar />
-      <div style={{ paddingTop: "80px" }}>
+      <div style={{ paddingTop: "35px" }}>
         <AppRoutes />
       </div>
     </BrowserRouter>

@@ -1,5 +1,6 @@
 import React, { memo, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getToken, isAdmin } from "../../utils/auth";
 
 type User = {
   id: number;
@@ -219,6 +220,15 @@ const styles = `
     color: #cbd5e1;
   }
   .empty-emoji { font-size: 48px; }
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 220px;
+    color: #cbd5e1;
+  }
   .modal-overlay {
     position: fixed;
     inset: 0;
@@ -275,14 +285,22 @@ const UserRow = memo(function UserRow({ user, onOpen, onEdit, onDelete }: UserRo
       </td>
       <td>{user.email}</td>
       <td>
-        <span className={`role-pill ${String(user.role).toLowerCase() === "admin" ? "role-admin" : "role-user"}`}>
+        <span
+          className={`role-pill ${
+            String(user.role).toLowerCase() === "admin" ? "role-admin" : "role-user"
+          }`}
+        >
           {user.role}
         </span>
       </td>
       <td>
         <div className="row-actions">
-          <button className="btn-outline" onClick={() => onEdit(user)}>Edit</button>
-          <button className="btn-danger" onClick={() => onDelete(user.id)}>Delete</button>
+          <button className="btn-outline" onClick={() => onEdit(user)}>
+            Edit
+          </button>
+          <button className="btn-danger" onClick={() => onDelete(user.id)}>
+            Delete
+          </button>
         </div>
       </td>
     </tr>
@@ -291,61 +309,115 @@ const UserRow = memo(function UserRow({ user, onOpen, onEdit, onDelete }: UserRo
 
 export default function UsersList() {
   const navigate = useNavigate();
+  const admin = isAdmin();
+  const token = getToken();
 
   const [users, setUsers] = useState<User[]>([]);
-  const [newUser, setNewUser] = useState<User>({ id: 0, name: "", email: "", role: "User" });
+  const [newUser, setNewUser] = useState({
+    name: "",
+    email: "",
+    role: "USER",
+  });
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const authHeaders = (): HeadersInit => ({
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  });
+
+  const authOnlyHeaders = (): HeadersInit => ({
+    Authorization: `Bearer ${token}`,
+  });
+
+  const loadUsers = async () => {
+    if (!admin) {
+      navigate("/me", { replace: true });
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const res = await fetch("http://localhost:5000/users", {
+        headers: authOnlyHeaders(),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch users. Status: ${res.status}`);
+      }
+
+      const data: User[] = await res.json();
+      setUsers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to fetch users", err);
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    fetch("http://localhost:5000/users")
-      .then((res) => res.json())
-      .then((data) => setUsers(data))
-      .catch((err) => console.error("Failed to fetch users", err));
-  }, []);
+    loadUsers();
+  }, [admin]);
 
   const sortedUsers = useMemo(() => [...users].sort((a, b) => a.id - b.id), [users]);
 
   const handleAdd = async () => {
+    if (!admin) return;
     if (!newUser.name || !newUser.email) return;
 
     try {
       const res = await fetch("http://localhost:5000/users", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(),
         body: JSON.stringify({
           name: newUser.name,
           email: newUser.email,
           password: "123456",
-          role: newUser.role.toUpperCase(),
+          role: String(newUser.role).toUpperCase(),
         }),
       });
 
-      const createdUser = await res.json();
+      if (!res.ok) {
+        throw new Error(`Failed to create user. Status: ${res.status}`);
+      }
+
+      const createdUser: User = await res.json();
       setUsers((prev) => [...prev, createdUser]);
-      setNewUser({ id: 0, name: "", email: "", role: "User" });
+      setNewUser({ name: "", email: "", role: "USER" });
     } catch (err) {
       console.error("Create failed", err);
     }
   };
 
   const handleDelete = async (id: number) => {
+    if (!admin) return;
     if (!window.confirm("Delete this user?")) return;
 
     try {
-      await fetch(`http://localhost:5000/users/${id}`, { method: "DELETE" });
+      const res = await fetch(`http://localhost:5000/users/${id}`, {
+        method: "DELETE",
+        headers: authOnlyHeaders(),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to delete user. Status: ${res.status}`);
+      }
+
       setUsers((prev) => prev.filter((u) => u.id !== id));
-    } catch {
-      setUsers((prev) => prev.filter((u) => u.id !== id));
+    } catch (err) {
+      console.error("Delete failed", err);
     }
   };
 
   const handleSaveEdit = async () => {
-    if (!editingUser) return;
+    if (!admin || !editingUser) return;
 
     try {
       const res = await fetch(`http://localhost:5000/users/${editingUser.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(),
         body: JSON.stringify({
           name: editingUser.name,
           email: editingUser.email,
@@ -353,14 +425,19 @@ export default function UsersList() {
         }),
       });
 
-      const updated = await res.json();
+      if (!res.ok) {
+        throw new Error(`Failed to update user. Status: ${res.status}`);
+      }
+
+      const updated: User = await res.json();
       setUsers((prev) => prev.map((u) => (u.id === editingUser.id ? updated : u)));
       setEditingUser(null);
-    } catch {
-      setUsers((prev) => prev.map((u) => (u.id === editingUser.id ? editingUser : u)));
-      setEditingUser(null);
+    } catch (err) {
+      console.error("Save edit failed", err);
     }
   };
+
+  if (!admin) return null;
 
   return (
     <>
@@ -371,7 +448,8 @@ export default function UsersList() {
             <div className="badge">Premium Users Dashboard</div>
             <h1 className="page-title">Users List</h1>
             <p className="page-subtitle">
-              Manage users with a polished interface and open a dedicated details view for user info, cats, addresses, and settings.
+              Manage users with a polished interface and open a dedicated details view for user
+              info, cats, addresses, and settings.
             </p>
           </div>
 
@@ -384,25 +462,42 @@ export default function UsersList() {
             <div className="form-grid">
               <div className="field">
                 <label>Name</label>
-                <input className="input" placeholder="Full name" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} />
+                <input
+                  className="input"
+                  placeholder="Full name"
+                  value={newUser.name}
+                  onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                />
               </div>
 
               <div className="field">
                 <label>Email</label>
-                <input className="input" type="email" placeholder="Email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
+                <input
+                  className="input"
+                  type="email"
+                  placeholder="Email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                />
               </div>
 
               <div className="field">
                 <label>Role</label>
-                <select className="input" value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}>
-                  <option>User</option>
-                  <option>Admin</option>
+                <select
+                  className="input"
+                  value={newUser.role}
+                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                >
+                  <option value="USER">User</option>
+                  <option value="ADMIN">Admin</option>
                 </select>
               </div>
             </div>
 
             <div className="button-row">
-              <button className="btn" onClick={handleAdd}>Add User</button>
+              <button className="btn" onClick={handleAdd}>
+                Add User
+              </button>
             </div>
           </div>
 
@@ -419,13 +514,24 @@ export default function UsersList() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedUsers.length === 0 ? (
+                  {loading ? (
+                    <tr>
+                      <td colSpan={5}>
+                        <div className="loading-state">
+                          <div className="empty-emoji">⏳</div>
+                          <h2 style={{ margin: 0 }}>Loading Users</h2>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : sortedUsers.length === 0 ? (
                     <tr>
                       <td colSpan={5}>
                         <div className="empty-state">
                           <div className="empty-emoji">👤</div>
                           <h2 style={{ margin: 0 }}>No Users Found</h2>
-                          <p style={{ margin: 0, color: "#94a3b8" }}>Create your first user to get started.</p>
+                          <p style={{ margin: 0, color: "#94a3b8" }}>
+                            Create your first user to get started.
+                          </p>
                         </div>
                       </td>
                     </tr>
@@ -434,7 +540,7 @@ export default function UsersList() {
                       <UserRow
                         key={user.id}
                         user={user}
-                        onOpen={(id) => navigate(`/users/${id}`)}
+                        onOpen={(userId) => navigate(`/users/${userId}`)}
                         onEdit={setEditingUser}
                         onDelete={handleDelete}
                       />
@@ -447,15 +553,32 @@ export default function UsersList() {
 
           {editingUser && (
             <Modal title="Edit User" onClose={() => setEditingUser(null)}>
-              <input className="input" value={editingUser.name} onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })} />
-              <input className="input" type="email" value={editingUser.email} onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })} />
-              <select className="input" value={editingUser.role} onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}>
-                <option>User</option>
-                <option>Admin</option>
+              <input
+                className="input"
+                value={editingUser.name}
+                onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
+              />
+              <input
+                className="input"
+                type="email"
+                value={editingUser.email}
+                onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+              />
+              <select
+                className="input"
+                value={editingUser.role}
+                onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
+              >
+                <option value="USER">User</option>
+                <option value="ADMIN">Admin</option>
               </select>
               <div className="button-row" style={{ padding: 0, justifyContent: "flex-end" }}>
-                <button className="btn-outline" onClick={() => setEditingUser(null)}>Cancel</button>
-                <button className="btn" onClick={handleSaveEdit}>Save</button>
+                <button className="btn-outline" onClick={() => setEditingUser(null)}>
+                  Cancel
+                </button>
+                <button className="btn" onClick={handleSaveEdit}>
+                  Save
+                </button>
               </div>
             </Modal>
           )}
@@ -471,7 +594,9 @@ function Modal({ title, children, onClose }: ModalProps) {
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h3 className="modal-title">{title}</h3>
-          <button className="btn-outline" onClick={onClose}>✕</button>
+          <button className="btn-outline" onClick={onClose}>
+            ✕
+          </button>
         </div>
         <div className="modal-body">{children}</div>
       </div>

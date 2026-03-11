@@ -1,5 +1,6 @@
 import React, { memo, useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { getToken, isAdmin } from "../../utils/auth";
 
 type Cat = {
   id: number;
@@ -32,7 +33,6 @@ const sharedStyles = `
   * { box-sizing: border-box; }
   .details-page {
     min-height: 100vh;
-    padding: 18px;
     color: white;
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     background: linear-gradient(180deg, #111827 0%, #0f172a 45%, #020617 100%);
@@ -280,6 +280,8 @@ const InfoCard = memo(function InfoCard({ label, value }: InfoCardProps) {
 export default function CatDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const admin = isAdmin();
+  const token = getToken();
 
   const [cat, setCat] = useState<Cat | null>(null);
   const [formData, setFormData] = useState<Cat | null>(null);
@@ -291,14 +293,47 @@ export default function CatDetails() {
 
   const fetchCat = async () => {
     try {
-      const res = await fetch(`http://localhost:5000/cats/${id}`);
+      const res = await fetch(`http://localhost:5000/cats/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch cat. Status: ${res.status}`);
+      }
+
       const data = await res.json();
       setCat(data);
       setFormData(data);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to fetch cat", err);
+      setCat(null);
+      setFormData(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUsers = async () => {
+    if (!admin) return;
+
+    try {
+      const res = await fetch("http://localhost:5000/users", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch users. Status: ${res.status}`);
+      }
+
+      const data = await res.json();
+      setUsers(data);
+    } catch (err) {
+      console.error("Failed to fetch users", err);
+      setUsers([]);
     }
   };
 
@@ -307,24 +342,31 @@ export default function CatDetails() {
   }, [id]);
 
   useEffect(() => {
-    fetch("http://localhost:5000/users")
-      .then((res) => res.json())
-      .then((data) => setUsers(data))
-      .catch((err) => console.error("Failed to fetch users", err));
-  }, []);
+    fetchUsers();
+  }, [admin]);
 
-  const ownerOptions = useMemo(() => users.map((user) => (
-    <option key={user.id} value={user.id}>{user.name}</option>
-  )), [users]);
+  const ownerOptions = useMemo(
+    () =>
+      users.map((user) => (
+        <option key={user.id} value={user.id}>
+          {user.name}
+        </option>
+      )),
+    [users]
+  );
 
   const handleSave = async () => {
-    if (!formData || !cat) return;
+    if (!formData || !cat || !admin) return;
 
     try {
       setSaving(true);
+
       const res = await fetch(`http://localhost:5000/cats/${cat.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           name: formData.name,
           age: formData.age,
@@ -333,6 +375,10 @@ export default function CatDetails() {
           priority: !!formData.priority,
         }),
       });
+
+      if (!res.ok) {
+        throw new Error(`Failed to save cat. Status: ${res.status}`);
+      }
 
       const updated = await res.json();
       setCat(updated);
@@ -351,14 +397,21 @@ export default function CatDetails() {
   };
 
   const assignOwner = async () => {
-    if (!ownerId || !cat) return;
+    if (!ownerId || !cat || !admin) return;
 
     try {
       const res = await fetch(`http://localhost:5000/cats/${cat.id}/assign-owner`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ ownerId }),
       });
+
+      if (!res.ok) {
+        throw new Error(`Failed to assign owner. Status: ${res.status}`);
+      }
 
       const updated = await res.json();
       setCat(updated);
@@ -370,12 +423,19 @@ export default function CatDetails() {
   };
 
   const removeOwner = async () => {
-    if (!cat) return;
+    if (!cat || !admin) return;
 
     try {
       const res = await fetch(`http://localhost:5000/cats/${cat.id}/remove-owner`, {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
+
+      if (!res.ok) {
+        throw new Error(`Failed to remove owner. Status: ${res.status}`);
+      }
 
       const updated = await res.json();
       setCat(updated);
@@ -386,13 +446,23 @@ export default function CatDetails() {
   };
 
   const deleteCat = async () => {
-    if (!cat) return;
+    if (!cat || !admin) return;
     const confirmDelete = window.confirm("Are you sure you want to delete this cat?");
     if (!confirmDelete) return;
 
     try {
-      await fetch(`http://localhost:5000/cats/${cat.id}`, { method: "DELETE" });
-      navigate("/");
+      const res = await fetch(`http://localhost:5000/cats/${cat.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to delete cat. Status: ${res.status}`);
+      }
+
+      navigate("/cats");
     } catch (err) {
       console.error("Delete failed", err);
     }
@@ -414,7 +484,20 @@ export default function CatDetails() {
     );
   }
 
-  if (!cat || !formData) return null;
+  if (!cat || !formData) {
+    return (
+      <>
+        <style>{sharedStyles}</style>
+        <div className="details-page">
+          <div className="details-shell loading-shell">
+            <div className="loading-box">
+              <h2>Cat data could not be loaded.</h2>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -422,15 +505,17 @@ export default function CatDetails() {
       <div className="details-page">
         <div className="details-shell">
           <div className="hero">
-            <div className="badge">Premium Cat Details</div>
+            <div className="badge">{admin ? "Premium Cat Details" : "My Cat Details"}</div>
             <h1 className="page-title">Meet {cat.name}</h1>
             <p className="page-subtitle">
-              View, edit, assign an owner, and manage this cat without changing the existing functionality.
+              {admin
+                ? "View, edit, assign an owner, and manage this cat without changing the existing functionality."
+                : "View details of your cat in the same premium interface."}
             </p>
           </div>
 
           <div className="top-actions">
-            <button onClick={() => navigate(-1)} className="btn-outline">← Back</button>
+            <button onClick={() => navigate("/cats")} className="btn-outline">← Back</button>
           </div>
 
           <div className="profile-card">
@@ -497,8 +582,6 @@ export default function CatDetails() {
                     <span>Priority</span>
                   </label>
 
-                  <input className="glass-input" type="file" />
-
                   {!cat.owner && (
                     <>
                       <select
@@ -510,31 +593,37 @@ export default function CatDetails() {
                         {ownerOptions}
                       </select>
 
-                      <button className="btn-soft" onClick={assignOwner} disabled={!ownerId}>👤 Assign Owner</button>
+                      <button className="btn-soft" onClick={assignOwner} disabled={!ownerId}>
+                        👤 Assign Owner
+                      </button>
                     </>
                   )}
 
                   {cat.owner && (
-                    <button className="btn-danger" onClick={removeOwner}>❌ Remove Owner</button>
+                    <button className="btn-danger" onClick={removeOwner}>
+                      ❌ Remove Owner
+                    </button>
                   )}
                 </div>
               )}
             </div>
 
             <div className="actions-row">
-              {isEditing ? (
-                <>
-                  <button className="btn-primary" onClick={handleSave} disabled={saving}>
-                    {saving ? "Saving..." : "Save Changes"}
-                  </button>
-                  <button className="btn-danger" onClick={handleCancel}>Cancel</button>
-                </>
-              ) : (
-                <>
-                  <button className="btn-primary" onClick={() => setIsEditing(true)}>✏️ Edit</button>
-                  <button className="btn-danger" onClick={deleteCat}>🗑 Delete Cat</button>
-                </>
-              )}
+              {admin ? (
+                isEditing ? (
+                  <>
+                    <button className="btn-primary" onClick={handleSave} disabled={saving}>
+                      {saving ? "Saving..." : "Save Changes"}
+                    </button>
+                    <button className="btn-danger" onClick={handleCancel}>Cancel</button>
+                  </>
+                ) : (
+                  <>
+                    <button className="btn-primary" onClick={() => setIsEditing(true)}>✏️ Edit</button>
+                    <button className="btn-danger" onClick={deleteCat}>🗑 Delete Cat</button>
+                  </>
+                )
+              ) : null}
             </div>
           </div>
         </div>

@@ -401,7 +401,7 @@ app.delete("/users/:id", authMiddleware, requireAdmin, async (req, res) => {
    BREEDS
 ======================================================= */
 
-app.get("/cats", authMiddleware, requireAdmin, async (req, res) => {
+app.get("/breeds", authMiddleware, requireAdmin, async (req, res) => {
   try {
     const breeds = await prisma.breed.findMany();
     res.json(breeds);
@@ -516,27 +516,6 @@ console.log("QUERY RECEIVED:", req.query);
           ? error.message
           : "Failed to fetch cats",
     });
-  }
-});
-app.get("/my/cats", authMiddleware, async (req: AuthRequest, res) => {
-  try {
-    const cats = await prisma.cat.findMany({
-      where: {
-        ownerId: req.user!.id,
-      },
-      include: {
-        breed: true,
-        owner: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-
-    res.json(cats);
-  } catch (error) {
-    console.error("GET /my/cats error:", error);
-    res.status(500).json({ error: "Failed to fetch user cats" });
   }
 });
 /* =======================================================
@@ -705,7 +684,7 @@ app.post("/cats/:id/remove-owner", authMiddleware, requireAdmin, async (req, res
    DELETE CAT
 ======================================================= */
 
-app.delete("/cats/:id", async (req, res) => {
+app.delete("/cats/:id", authMiddleware, requireAdmin, async (req, res) => {
   try {
     const id = Number(req.params.id);
 
@@ -717,6 +696,97 @@ app.delete("/cats/:id", async (req, res) => {
   } catch (error) {
     console.error("DELETE /cats error:", error);
     res.status(500).json({ error: "Failed to delete cat" });
+  }
+});
+
+app.get("/my/cats", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const {
+      search,
+      minAge,
+      maxAge,
+      breedId,
+      status,
+      fromDate,
+      toDate,
+    } = req.query;
+
+    const where: any = {
+      ownerId: req.user!.id,
+    };
+
+    if (search && String(search).trim() !== "") {
+      where.OR = [
+        {
+          name: {
+            contains: String(search),
+            mode: "insensitive",
+          },
+        },
+        {
+          status: {
+            contains: String(search),
+            mode: "insensitive",
+          },
+        },
+        {
+          breed: {
+            name: {
+              contains: String(search),
+              mode: "insensitive",
+            },
+          },
+        },
+      ];
+    }
+
+    if (breedId !== undefined && breedId !== "") {
+      where.breedId = Number(breedId);
+    }
+
+    if (status !== undefined && status !== "") {
+      where.status = String(status);
+    }
+
+    if ((minAge !== undefined && minAge !== "") || (maxAge !== undefined && maxAge !== "")) {
+      where.age = {};
+
+      if (minAge !== undefined && minAge !== "") {
+        where.age.gte = Number(minAge);
+      }
+
+      if (maxAge !== undefined && maxAge !== "") {
+        where.age.lte = Number(maxAge);
+      }
+    }
+
+    if ((fromDate !== undefined && fromDate !== "") || (toDate !== undefined && toDate !== "")) {
+      where.createdAt = {};
+
+      if (fromDate !== undefined && fromDate !== "") {
+        where.createdAt.gte = new Date(String(fromDate));
+      }
+
+      if (toDate !== undefined && toDate !== "") {
+        where.createdAt.lte = new Date(String(toDate));
+      }
+    }
+
+    const cats = await prisma.cat.findMany({
+      where,
+      include: {
+        breed: true,
+        owner: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    res.json(cats);
+  } catch (error) {
+    console.error("GET /my/cats error:", error);
+    res.status(500).json({ error: "Failed to fetch user cats" });
   }
 });
 

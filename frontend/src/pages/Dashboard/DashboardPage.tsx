@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getToken, isAdmin } from "../../utils/auth";
 
 type Overview = {
   totalCats: number;
@@ -226,13 +227,30 @@ const styles = `
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const admin = isAdmin();
+  const token = getToken();
+
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const authOnlyHeaders = (): HeadersInit => ({
+    Authorization: `Bearer ${token}`,
+  });
+
   useEffect(() => {
+    if (!admin) {
+      navigate("/me", { replace: true });
+      return;
+    }
+
     const fetchDashboard = async () => {
       try {
-        const res = await fetch("http://localhost:5000/dashboard/stats");
+        setLoading(true);
+
+        const res = await fetch("http://localhost:5000/dashboard/stats", {
+          headers: authOnlyHeaders(),
+        });
+
         if (!res.ok) {
           throw new Error(`Failed to fetch dashboard. Status: ${res.status}`);
         }
@@ -241,13 +259,16 @@ export default function DashboardPage() {
         setData(json);
       } catch (error) {
         console.error("Failed to fetch dashboard", error);
+        setData(null);
       } finally {
         setLoading(false);
       }
     };
 
     fetchDashboard();
-  }, []);
+  }, [admin, navigate]);
+
+  if (!admin) return null;
 
   if (loading) {
     return (

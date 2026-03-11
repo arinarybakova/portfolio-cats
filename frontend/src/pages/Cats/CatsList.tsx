@@ -1,6 +1,7 @@
 import React, { memo, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Slider from "@mui/material/Slider";
+import { getToken, isAdmin } from "../../utils/auth";
 
 /* ================= TYPES ================= */
 
@@ -19,6 +20,10 @@ type Cat = {
   breed: Breed;
   createdAt: string;
   priority?: boolean;
+  owner?: {
+    id: number;
+    name: string;
+  };
 };
 
 type ModalProps = {
@@ -29,6 +34,7 @@ type ModalProps = {
 
 type CatRowProps = {
   cat: Cat;
+  admin: boolean;
   onEdit: (cat: Cat) => void;
   onDelete: (id: number) => void;
   onOpen: (id: number) => void;
@@ -342,7 +348,7 @@ const PAGE_STYLES = `
   }
 `;
 
-const CatRow = memo(function CatRow({ cat, onEdit, onDelete, onOpen }: CatRowProps) {
+const CatRow = memo(function CatRow({ cat, admin, onEdit, onDelete, onOpen }: CatRowProps) {
   return (
     <tr className={`table-row ${cat.priority ? "priority-row" : ""}`}>
       <td>
@@ -352,17 +358,33 @@ const CatRow = memo(function CatRow({ cat, onEdit, onDelete, onOpen }: CatRowPro
         </span>
       </td>
       <td>{cat.age}</td>
-      <td>{cat.breed?.name}</td>
+      <td>{cat.breed?.name || "Unknown breed"}</td>
       <td>
         <span className={`status-pill status-${cat.status}`}>{cat.status}</span>
       </td>
       <td>
-        {cat.image ? <img src={cat.image} alt={cat.name} className="thumb" loading="lazy" /> : <span style={{ color: "#94a3b8" }}>No image</span>}
+        {cat.image ? (
+          <img src={cat.image} alt={cat.name} className="thumb" loading="lazy" />
+        ) : (
+          <span style={{ color: "#94a3b8" }}>No image</span>
+        )}
       </td>
       <td>
         <div className="row-actions">
-          <button className="btn-outline" onClick={() => onEdit(cat)}>✏ Edit</button>
-          <button className="btn-danger" onClick={() => onDelete(cat.id)}>Delete</button>
+          {admin ? (
+            <>
+              <button className="btn-outline" onClick={() => onEdit(cat)}>
+                ✏ Edit
+              </button>
+              <button className="btn-danger" onClick={() => onDelete(cat.id)}>
+                Delete
+              </button>
+            </>
+          ) : (
+            <button className="btn-outline" onClick={() => onOpen(cat.id)}>
+              Open
+            </button>
+          )}
         </div>
       </td>
     </tr>
@@ -371,12 +393,19 @@ const CatRow = memo(function CatRow({ cat, onEdit, onDelete, onOpen }: CatRowPro
 
 export default function CatsList() {
   const navigate = useNavigate();
+  const admin = isAdmin();
 
   const [cats, setCats] = useState<Cat[]>([]);
   const [breeds, setBreeds] = useState<Breed[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Cat | null>(null);
-  const [form, setForm] = useState({ name: "", age: "", breedId: "", image: "" });
+  const [form, setForm] = useState({
+    name: "",
+    age: "",
+    breedId: "",
+    image: "",
+    status: "AVAILABLE",
+  });
   const [filters, setFilters] = useState({
     search: "",
     minAge: "",
@@ -395,69 +424,171 @@ export default function CatsList() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+  const [loading, setLoading] = useState(true);
+
+  const authHeaders = (): HeadersInit => {
+    const token = getToken();
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+  };
+
+  const authOnlyHeaders = (): HeadersInit => {
+    const token = getToken();
+    return {
+      Authorization: `Bearer ${token}`,
+    };
+  };
 
   const loadCats = async () => {
-    const query = new URLSearchParams(Object.entries(filters).filter(([_, v]) => v !== "")).toString();
-    const res = await fetch(`http://localhost:5000/cats?${query}`);
-    const data = await res.json();
-    setCats(data);
-    setCurrentPage(1);
+    try {
+      setLoading(true);
+
+      const query = new URLSearchParams(
+        Object.entries(filters).filter(([_, value]) => value !== "")
+      ).toString();
+
+      const baseUrl = admin
+        ? "http://localhost:5000/cats"
+        : "http://localhost:5000/my/cats";
+
+      const url = `${baseUrl}${query ? `?${query}` : ""}`;
+
+      const res = await fetch(url, {
+        headers: authOnlyHeaders(),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch cats. Status: ${res.status}`);
+      }
+
+      const data: Cat[] = await res.json();
+
+      setCats(Array.isArray(data) ? data : []);
+      setCurrentPage(1);
+    } catch (error) {
+      console.error("Failed to load cats", error);
+      setCats([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loadBreeds = async () => {
-    const res = await fetch("http://localhost:5000/breeds");
-    const data = await res.json();
-    setBreeds(data);
+    try {
+      const res = await fetch("http://localhost:5000/breeds", {
+        headers: authOnlyHeaders(),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch breeds. Status: ${res.status}`);
+      }
+
+      const data: Breed[] = await res.json();
+      setBreeds(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Failed to load breeds", error);
+      setBreeds([]);
+    }
   };
 
   useEffect(() => {
     loadBreeds();
-    loadCats();
   }, []);
+
+  useEffect(() => {
+    loadCats();
+  }, [admin]);
 
   useEffect(() => {
     setAgeDraft([minAge, maxAge]);
   }, [minAge, maxAge]);
 
-  const totalPages = Math.ceil(cats.length / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(cats.length / itemsPerPage));
 
   const paginatedCats = useMemo(
     () => cats.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
-    [cats, currentPage],
+    [cats, currentPage]
   );
 
   const handleCreate = async () => {
-    await fetch("http://localhost:5000/cats", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: form.name,
-        age: Number(form.age),
-        breedId: Number(form.breedId),
-        image: form.image,
-      }),
-    });
+    try {
+      const res = await fetch("http://localhost:5000/cats", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          name: form.name,
+          age: Number(form.age),
+          breedId: Number(form.breedId),
+          image: form.image,
+          status: form.status,
+        }),
+      });
 
-    setShowAdd(false);
-    setForm({ name: "", age: "", breedId: "", image: "" });
-    loadCats();
+      if (!res.ok) {
+        throw new Error(`Failed to create cat. Status: ${res.status}`);
+      }
+
+      setShowAdd(false);
+      setForm({
+        name: "",
+        age: "",
+        breedId: "",
+        image: "",
+        status: "AVAILABLE",
+      });
+      await loadCats();
+    } catch (error) {
+      console.error("Failed to create cat", error);
+    }
   };
 
   const handleUpdate = async () => {
     if (!editing) return;
-    await fetch(`http://localhost:5000/cats/${editing.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editing),
-    });
-    setEditing(null);
-    loadCats();
+
+    try {
+      const res = await fetch(`http://localhost:5000/cats/${editing.id}`, {
+        method: "PUT",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          name: editing.name,
+          age: Number(editing.age),
+          status: editing.status,
+          image: editing.image,
+          priority: !!editing.priority,
+          breedId: editing.breedId,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to update cat. Status: ${res.status}`);
+      }
+
+      setEditing(null);
+      await loadCats();
+    } catch (error) {
+      console.error("Failed to update cat", error);
+    }
   };
 
   const handleDelete = async (id: number) => {
     if (!window.confirm("Delete this cat?")) return;
-    await fetch(`http://localhost:5000/cats/${id}`, { method: "DELETE" });
-    loadCats();
+
+    try {
+      const res = await fetch(`http://localhost:5000/cats/${id}`, {
+        method: "DELETE",
+        headers: authOnlyHeaders(),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to delete cat. Status: ${res.status}`);
+      }
+
+      await loadCats();
+    } catch (error) {
+      console.error("Failed to delete cat", error);
+    }
   };
 
   const clearFilters = () => {
@@ -471,7 +602,7 @@ export default function CatsList() {
       toDate: "",
     });
     setAgeDraft([MIN, MAX]);
-    setTimeout(loadCats, 0);
+    setCurrentPage(1);
   };
 
   return (
@@ -480,16 +611,22 @@ export default function CatsList() {
       <div className="cats-page">
         <div className="cats-shell">
           <div className="hero">
-            <div className="badge">Premium Cats Dashboard</div>
-            <h1 className="page-title">Cats Collection</h1>
+            <div className="badge">{admin ? "Premium Cats Dashboard" : "My Cats"}</div>
+            <h1 className="page-title">{admin ? "Cats Collection" : "Owned Cats"}</h1>
             <p className="page-subtitle">
-              Manage your cats, filter quickly, and keep the same functionality with a polished premium interface.
+              {admin
+                ? "Manage all cats, filter quickly, and keep the same functionality with a polished premium interface."
+                : "Browse and filter only the cats owned by your account in the same polished premium interface."}
             </p>
           </div>
 
-          <div className="top-actions">
-            <button className="btn" onClick={() => setShowAdd(true)}>➕ Add Cat</button>
-          </div>
+          {admin && (
+            <div className="top-actions">
+              <button className="btn" onClick={() => setShowAdd(true)}>
+                ➕ Add Cat
+              </button>
+            </div>
+          )}
 
           <div className="panel filters-card">
             <div className="filters-head">
@@ -511,7 +648,10 @@ export default function CatsList() {
               <div className="field slider-box">
                 <label>Age From</label>
                 <div className="range-card">
-                  <div className="range-top"><span>Minimum age</span><span>{ageDraft[0]}</span></div>
+                  <div className="range-top">
+                    <span>Minimum age</span>
+                    <span>{ageDraft[0]}</span>
+                  </div>
                   <Slider
                     min={MIN}
                     max={MAX}
@@ -524,7 +664,11 @@ export default function CatsList() {
                       if (typeof value !== "number") return;
                       const newMin = value;
                       const adjustedMax = Math.max(newMin, ageDraft[1]);
-                      setFilters((prev) => ({ ...prev, minAge: String(newMin), maxAge: String(adjustedMax) }));
+                      setFilters((prev) => ({
+                        ...prev,
+                        minAge: String(newMin),
+                        maxAge: String(adjustedMax),
+                      }));
                     }}
                   />
                 </div>
@@ -533,7 +677,10 @@ export default function CatsList() {
               <div className="field slider-box">
                 <label>Age To</label>
                 <div className="range-card">
-                  <div className="range-top"><span>Maximum age</span><span>{ageDraft[1]}</span></div>
+                  <div className="range-top">
+                    <span>Maximum age</span>
+                    <span>{ageDraft[1]}</span>
+                  </div>
                   <Slider
                     min={MIN}
                     max={MAX}
@@ -546,7 +693,11 @@ export default function CatsList() {
                       if (typeof value !== "number") return;
                       const newMax = value;
                       const adjustedMin = Math.min(ageDraft[0], newMax);
-                      setFilters((prev) => ({ ...prev, minAge: String(adjustedMin), maxAge: String(newMax) }));
+                      setFilters((prev) => ({
+                        ...prev,
+                        minAge: String(adjustedMin),
+                        maxAge: String(newMax),
+                      }));
                     }}
                   />
                 </div>
@@ -554,15 +705,27 @@ export default function CatsList() {
 
               <div className="field">
                 <label>Breed</label>
-                <select className="input" value={filters.breedId} onChange={(e) => setFilters({ ...filters, breedId: e.target.value })}>
+                <select
+                  className="input"
+                  value={filters.breedId}
+                  onChange={(e) => setFilters({ ...filters, breedId: e.target.value })}
+                >
                   <option value="">All Breeds</option>
-                  {breeds.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  {breeds.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               <div className="field">
                 <label>Status</label>
-                <select className="input" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
+                <select
+                  className="input"
+                  value={filters.status}
+                  onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                >
                   <option value="">All Status</option>
                   <option value="AVAILABLE">AVAILABLE</option>
                   <option value="ADOPTED">ADOPTED</option>
@@ -572,18 +735,32 @@ export default function CatsList() {
 
               <div className="field">
                 <label>From Date</label>
-                <input type="date" className="input" value={filters.fromDate} onChange={(e) => setFilters({ ...filters, fromDate: e.target.value })} />
+                <input
+                  type="date"
+                  className="input"
+                  value={filters.fromDate}
+                  onChange={(e) => setFilters({ ...filters, fromDate: e.target.value })}
+                />
               </div>
 
               <div className="field">
                 <label>To Date</label>
-                <input type="date" className="input" value={filters.toDate} onChange={(e) => setFilters({ ...filters, toDate: e.target.value })} />
+                <input
+                  type="date"
+                  className="input"
+                  value={filters.toDate}
+                  onChange={(e) => setFilters({ ...filters, toDate: e.target.value })}
+                />
               </div>
             </div>
 
             <div className="button-row">
-              <button className="btn" onClick={loadCats}>🔎 Search</button>
-              <button className="btn-outline" onClick={clearFilters}>Clear</button>
+              <button className="btn" onClick={loadCats}>
+                🔎 Search
+              </button>
+              <button className="btn-outline" onClick={clearFilters}>
+                Clear
+              </button>
             </div>
           </div>
 
@@ -601,13 +778,24 @@ export default function CatsList() {
                   </tr>
                 </thead>
                 <tbody>
-                  {cats.length === 0 ? (
+                  {loading ? (
+                    <tr>
+                      <td colSpan={6}>
+                        <div className="empty-state">
+                          <div className="empty-emoji">⏳</div>
+                          <h2 style={{ margin: 0 }}>Loading Cats</h2>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : cats.length === 0 ? (
                     <tr>
                       <td colSpan={6}>
                         <div className="empty-state">
                           <div className="empty-emoji">🔍</div>
                           <h2 style={{ margin: 0 }}>No Cats Found</h2>
-                          <p style={{ margin: 0, color: "#94a3b8" }}>Try adjusting your filters.</p>
+                          <p style={{ margin: 0, color: "#94a3b8" }}>
+                            {admin ? "Try adjusting your filters." : "No owned cats match your filters."}
+                          </p>
                         </div>
                       </td>
                     </tr>
@@ -616,7 +804,8 @@ export default function CatsList() {
                       <CatRow
                         key={cat.id}
                         cat={cat}
-                        onOpen={(id) => navigate(`/cats/${id}`)}
+                        admin={admin}
+                        onOpen={(catId) => navigate(`/cats/${catId}`)}
                         onEdit={setEditing}
                         onDelete={handleDelete}
                       />
@@ -627,21 +816,65 @@ export default function CatsList() {
             </div>
           </div>
 
-          {cats.length > 0 && (
+          {!loading && cats.length > 0 && (
             <div className="pagination">
-              <button className="btn-outline" disabled={currentPage === 1} onClick={() => setCurrentPage((p) => p - 1)} style={{ opacity: currentPage === 1 ? 0.5 : 1 }}>◀ Prev</button>
-              <div className="page-chip">Page {currentPage} / {totalPages || 1}</div>
-              <button className="btn-outline" disabled={currentPage === totalPages} onClick={() => setCurrentPage((p) => p + 1)} style={{ opacity: currentPage === totalPages ? 0.5 : 1 }}>Next ▶</button>
+              <button
+                className="btn-outline"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => p - 1)}
+                style={{ opacity: currentPage === 1 ? 0.5 : 1 }}
+              >
+                ◀ Prev
+              </button>
+              <div className="page-chip">
+                Page {currentPage} / {totalPages}
+              </div>
+              <button
+                className="btn-outline"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => p + 1)}
+                style={{ opacity: currentPage === totalPages ? 0.5 : 1 }}
+              >
+                Next ▶
+              </button>
             </div>
           )}
 
-          {showAdd && (
+          {admin && showAdd && (
             <Modal title="Add Cat" onClose={() => setShowAdd(false)}>
-              <input className="input" placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              <input type="number" className="input" placeholder="Age" value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} />
-              <select className="input" value={form.breedId} onChange={(e) => setForm({ ...form, breedId: e.target.value })}>
+              <input
+                className="input"
+                placeholder="Name"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+              <input
+                type="number"
+                className="input"
+                placeholder="Age"
+                value={form.age}
+                onChange={(e) => setForm({ ...form, age: e.target.value })}
+              />
+              <select
+                className="input"
+                value={form.breedId}
+                onChange={(e) => setForm({ ...form, breedId: e.target.value })}
+              >
                 <option value="">Select Breed</option>
-                {breeds.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                {breeds.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="input"
+                value={form.status}
+                onChange={(e) => setForm({ ...form, status: e.target.value })}
+              >
+                <option value="AVAILABLE">Available</option>
+                <option value="ADOPTED">Adopted</option>
+                <option value="PENDING">Pending</option>
               </select>
               <div className="upload-wrap">
                 <input
@@ -668,15 +901,62 @@ export default function CatsList() {
                 🤖 Generate Image
               </button>
               {form.image && <img src={form.image} alt="Preview" className="preview" loading="lazy" />}
-              <button className="btn" onClick={handleCreate}>Save</button>
+              <button className="btn" onClick={handleCreate}>
+                Save
+              </button>
             </Modal>
           )}
 
-          {editing && (
+          {admin && editing && (
             <Modal title="Edit Cat" onClose={() => setEditing(null)}>
-              <input className="input" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
-              <input type="number" className="input" value={editing.age} onChange={(e) => setEditing({ ...editing, age: Number(e.target.value) })} />
-              <button className="btn" onClick={handleUpdate}>Update</button>
+              <input
+                className="input"
+                value={editing.name}
+                onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+              />
+              <input
+                type="number"
+                className="input"
+                value={editing.age}
+                onChange={(e) => setEditing({ ...editing, age: Number(e.target.value) })}
+              />
+              <select
+                className="input"
+                value={editing.status}
+                onChange={(e) => setEditing({ ...editing, status: e.target.value })}
+              >
+                <option value="AVAILABLE">Available</option>
+                <option value="ADOPTED">Adopted</option>
+                <option value="PENDING">Pending</option>
+              </select>
+              <select
+                className="input"
+                value={editing.breedId}
+                onChange={(e) =>
+                  setEditing({
+                    ...editing,
+                    breedId: Number(e.target.value),
+                    breed: breeds.find((b) => b.id === Number(e.target.value)) || editing.breed,
+                  })
+                }
+              >
+                {breeds.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+              <label style={{ display: "flex", gap: 10, alignItems: "center", color: "white" }}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(editing.priority)}
+                  onChange={(e) => setEditing({ ...editing, priority: e.target.checked })}
+                />
+                Priority
+              </label>
+              <button className="btn" onClick={handleUpdate}>
+                Update
+              </button>
             </Modal>
           )}
         </div>
@@ -691,7 +971,9 @@ const Modal = memo(function Modal({ title, children, onClose }: ModalProps) {
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h3 className="modal-title">{title}</h3>
-          <button className="btn-outline" onClick={onClose}>✕</button>
+          <button className="btn-outline" onClick={onClose}>
+            ✕
+          </button>
         </div>
         <div className="modal-body">{children}</div>
       </div>

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { getToken, isAdmin } from "../../utils/auth";
 
 type User = {
   id: number;
@@ -141,6 +142,7 @@ const styles = `
     letter-spacing: 0.06em;
     border: 1px solid rgba(255,255,255,0.08);
     background: rgba(255,255,255,0.06);
+    text-transform: uppercase;
   }
   .role-admin { color: #fde68a; background: rgba(245,158,11,0.14); }
   .role-user { color: #bfdbfe; background: rgba(59,130,246,0.14); }
@@ -311,6 +313,9 @@ export default function UserDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
+  const admin = isAdmin();
+  const token = getToken();
+
   const [user, setUser] = useState<User | null>(null);
   const [form, setForm] = useState<User | null>(null);
   const [cats, setCats] = useState<Cat[]>([]);
@@ -325,20 +330,31 @@ export default function UserDetails() {
     marketing: false,
   });
 
-  const userId = Number(id);
+  const routeUserId = id ? Number(id) : null;
+  const viewedUserId = user?.id ?? routeUserId ?? 0;
 
   const fetchUser = async () => {
-    if (!id) return;
-
     try {
-      const res = await fetch(`http://localhost:5000/users/${id}`);
+      const url = admin && id
+        ? `http://localhost:5000/users/${id}`
+        : "http://localhost:5000/me";
+
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
       if (!res.ok) {
         throw new Error(`Failed to fetch user. Status: ${res.status}`);
       }
 
       const data: User = await res.json();
       setUser(data);
-      setForm(data);
+      setForm({
+        ...data,
+        role: String(data.role).toUpperCase(),
+      });
     } catch (err) {
       console.error("Failed to fetch user", err);
       setUser(null);
@@ -348,14 +364,29 @@ export default function UserDetails() {
 
   const fetchCats = async () => {
     try {
-      const res = await fetch("http://localhost:5000/cats");
+      const url = admin
+        ? "http://localhost:5000/cats"
+        : "http://localhost:5000/my/cats";
+
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
       if (!res.ok) {
         throw new Error(`Failed to fetch cats. Status: ${res.status}`);
       }
 
       const data: Cat[] = await res.json();
       setAllCats(data);
-      setCats(data.filter((cat) => cat.owner?.id === userId));
+
+      if (admin) {
+        const targetUserId = id ? Number(id) : 0;
+        setCats(data.filter((cat) => cat.owner?.id === targetUserId));
+      } else {
+        setCats(data);
+      }
     } catch (err) {
       console.error("Failed to fetch cats", err);
       setAllCats([]);
@@ -364,31 +395,42 @@ export default function UserDetails() {
   };
 
   useEffect(() => {
-    if (!id) {
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     Promise.all([fetchUser(), fetchCats()]).finally(() => setLoading(false));
-  }, [id]);
+  }, [id, admin, token]);
+  
 
   const availableCats = useMemo(() => {
-    return allCats.filter((cat) => !cat.owner || cat.owner.id === userId);
-  }, [allCats, userId]);
+    if (!admin || !viewedUserId) return [];
+    return allCats.filter((cat) => !cat.owner || cat.owner.id === viewedUserId);
+  }, [allCats, viewedUserId, admin]);
 
   const handleSaveInfo = async () => {
     if (!form || !user) return;
 
     try {
-      const res = await fetch(`http://localhost:5000/users/${user.id}`, {
+      const payload = admin
+        ? {
+            name: form.name,
+            email: form.email,
+            role: String(form.role).toUpperCase(),
+          }
+        : {
+            name: form.name,
+            email: form.email,
+          };
+
+      const url = admin
+        ? `http://localhost:5000/users/${user.id}`
+        : "http://localhost:5000/me";
+
+      const res = await fetch(url, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name,
-          email: form.email,
-          role: String(form.role).toUpperCase(),
-        }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -397,20 +439,26 @@ export default function UserDetails() {
 
       const updated: User = await res.json();
       setUser(updated);
-      setForm(updated);
+      setForm({
+        ...updated,
+        role: String(updated.role).toUpperCase(),
+      });
     } catch (err) {
       console.error("Failed to save user", err);
     }
   };
 
   const assignCat = async () => {
-    if (!selectedCatId || !id) return;
+    if (!admin || !selectedCatId || !viewedUserId) return;
 
     try {
       const res = await fetch(`http://localhost:5000/cats/${selectedCatId}/assign-owner`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ownerId: userId }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ ownerId: viewedUserId }),
       });
 
       if (!res.ok) {
@@ -426,9 +474,14 @@ export default function UserDetails() {
   };
 
   const removeCat = async (catId: number) => {
+    if (!admin) return;
+
     try {
       const res = await fetch(`http://localhost:5000/cats/${catId}/remove-owner`, {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (!res.ok) {
@@ -457,7 +510,7 @@ export default function UserDetails() {
     );
   }
 
-  if (!id) {
+  if (admin && !id) {
     return (
       <>
         <style>{styles}</style>
@@ -493,15 +546,17 @@ export default function UserDetails() {
       <div className="user-page">
         <div className="user-shell">
           <div className="hero">
-            <div className="badge">Premium User Details</div>
+            <div className="badge">{admin ? "User Details" : "My Profile"}</div>
             <h1 className="page-title">{user.name}</h1>
             <p className="page-subtitle">
-              Switch between user info, owned cats, addresses, and settings in one focused details view.
+              {admin
+                ? "View and manage user details, owned cats, addresses, and settings from one page."
+                : "Manage your own profile, view your account information, and see the cats you own."}
             </p>
           </div>
 
           <div className="top-actions">
-            <button className="btn-outline" onClick={() => navigate(-1)}>
+            <button className="btn-outline" onClick={() => navigate(admin ? "/users" : "/cats")}>
               ← Back
             </button>
           </div>
@@ -545,15 +600,18 @@ export default function UserDetails() {
             <button className={`tab-btn ${tab === "info" ? "active" : ""}`} onClick={() => setTab("info")}>
               User Info
             </button>
+
             <button className={`tab-btn ${tab === "cats" ? "active" : ""}`} onClick={() => setTab("cats")}>
-              Owned Cats
+              {admin ? "Owned Cats" : "My Cats"}
             </button>
+
             <button
               className={`tab-btn ${tab === "addresses" ? "active" : ""}`}
               onClick={() => setTab("addresses")}
             >
               Addresses
             </button>
+
             <button
               className={`tab-btn ${tab === "settings" ? "active" : ""}`}
               onClick={() => setTab("settings")}
@@ -575,6 +633,7 @@ export default function UserDetails() {
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
                     />
                   </div>
+
                   <div className="field">
                     <label>Email</label>
                     <input
@@ -583,18 +642,22 @@ export default function UserDetails() {
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
                     />
                   </div>
-                  <div className="field">
-                    <label>Role</label>
-                    <select
-                      className="input"
-                      value={form.role}
-                      onChange={(e) => setForm({ ...form, role: e.target.value })}
-                    >
-                      <option value="User">User</option>
-                      <option value="Admin">Admin</option>
-                    </select>
-                  </div>
+
+                  {admin && (
+                    <div className="field">
+                      <label>Role</label>
+                      <select
+                        className="input"
+                        value={String(form.role).toUpperCase()}
+                        onChange={(e) => setForm({ ...form, role: e.target.value })}
+                      >
+                        <option value="USER">User</option>
+                        <option value="ADMIN">Admin</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
+
                 <div className="row">
                   <button className="btn" onClick={handleSaveInfo}>
                     Save User Info
@@ -605,29 +668,34 @@ export default function UserDetails() {
 
             {tab === "cats" && (
               <div className="stack">
-                <h3 className="section-title-inline">Owned Cats</h3>
-                <div className="row">
-                  <select
-                    className="input"
-                    value={selectedCatId}
-                    onChange={(e) => setSelectedCatId(e.target.value ? Number(e.target.value) : "")}
-                    style={{ maxWidth: 340 }}
-                  >
-                    <option value="">Select cat to assign</option>
-                    {availableCats.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button className="btn" onClick={assignCat} disabled={!selectedCatId}>
-                    Assign Cat
-                  </button>
-                </div>
+                <h3 className="section-title-inline">{admin ? "Owned Cats" : "My Cats"}</h3>
+
+                {admin && (
+                  <div className="row">
+                    <select
+                      className="input"
+                      value={selectedCatId}
+                      onChange={(e) => setSelectedCatId(e.target.value ? Number(e.target.value) : "")}
+                      style={{ maxWidth: 340 }}
+                    >
+                      <option value="">Select cat to assign</option>
+                      {availableCats.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button className="btn" onClick={assignCat} disabled={!selectedCatId}>
+                      Assign Cat
+                    </button>
+                  </div>
+                )}
 
                 <div className="cat-list">
                   {cats.length === 0 ? (
-                    <div className="muted">This user does not own any cats yet.</div>
+                    <div className="muted">
+                      {admin ? "This user does not own any cats yet." : "You do not own any cats yet."}
+                    </div>
                   ) : (
                     cats.map((cat) => (
                       <div key={cat.id} className="cat-card">
@@ -642,15 +710,21 @@ export default function UserDetails() {
                             <div className="muted">
                               {cat.breed?.name || "Unknown breed"} · Age {cat.age} · {cat.status}
                             </div>
+                            {admin && cat.owner && (
+                              <div className="muted">Owner: {cat.owner.name}</div>
+                            )}
                           </div>
                         </div>
+
                         <div className="row" style={{ justifyContent: "flex-end" }}>
                           <button className="btn-outline" onClick={() => navigate(`/cats/${cat.id}`)}>
                             Open Cat
                           </button>
-                          <button className="btn-danger" onClick={() => removeCat(cat.id)}>
-                            Remove
-                          </button>
+                          {admin && (
+                            <button className="btn-danger" onClick={() => removeCat(cat.id)}>
+                              Remove
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))
