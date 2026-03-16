@@ -34,5 +34,9 @@
   },
   "prisma": {
     "seed": "node prisma/seed.js"
-  }
+  },
+  "scripts": {
+    "test:api": "vitest run",
+    "test:api:watch": "vitest"
+}
 }

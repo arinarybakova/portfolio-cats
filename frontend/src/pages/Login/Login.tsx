@@ -281,7 +281,14 @@ export default function Login() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data?.error || "Login failed");
+        const backendMessage = data?.error || "Login failed";
+
+        const prettyMessage =
+          backendMessage === "Selected account type does not match this user"
+            ? "The selected account type does not match this profile. Please switch between User and Admin and try again."
+            : backendMessage;
+
+        throw new Error(prettyMessage);
       }
 
       localStorage.setItem("token", data.token);
@@ -310,7 +317,8 @@ export default function Login() {
               <div className="hero-badge">Premium Cat Shelter Access</div>
               <h1 className="hero-title">Welcome back to your adoption hub.</h1>
               <p className="hero-subtitle">
-                Log in as a user or admin and continue managing cats, owners, breeds, and dashboard insights in one premium workspace.
+                Log in as a user or admin and continue managing cats, owners,
+                breeds, and dashboard insights in one premium workspace.
               </p>
 
               <div className="hero-stats">
@@ -330,9 +338,18 @@ export default function Login() {
             </div>
 
             <div className="feature-list">
-              <div className="feature-item">Track cats, breeds, owners, and adoptions in a single polished admin system.</div>
-              <div className="feature-item">Switch cleanly between user and admin account types from the login experience.</div>
-              <div className="feature-item">Designed for real flows and future Playwright end-to-end coverage.</div>
+              <div className="feature-item">
+                Track cats, breeds, owners, and adoptions in a single polished
+                admin system.
+              </div>
+              <div className="feature-item">
+                Switch cleanly between user and admin account types from the
+                login experience.
+              </div>
+              <div className="feature-item">
+                Designed for real flows and future Playwright end-to-end
+                coverage.
+              </div>
             </div>
           </div>
 
@@ -388,17 +405,29 @@ export default function Login() {
 
                 {error ? <div className="error-box">{error}</div> : null}
 
-                <button className="btn" type="submit" disabled={loading} data-testid="login-submit">
-                  {loading ? "Signing In..." : `Login as ${role === "ADMIN" ? "Admin" : "User"}`}
+                <button
+                  className="btn"
+                  type="submit"
+                  disabled={loading}
+                  data-testid="login-submit"
+                >
+                  {loading
+                    ? "Signing In..."
+                    : `Login as ${role === "ADMIN" ? "Admin" : "User"}`}
                 </button>
 
-                <button type="button" className="btn-outline" onClick={() => navigate("/")}>
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={() => navigate("/")}
+                >
                   Back to Home
                 </button>
               </form>
 
               <div className="bottom-note">
-                Don’t have an account? <Link to="/register">Create one here</Link>
+                Don’t have an account?{" "}
+                <Link to="/register">Create one here</Link>
               </div>
             </div>
           </div>
