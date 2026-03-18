@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "tsx watch server.ts"
+    "dev": "tsx watch server.ts",
+    "test:api": "vitest run",
+    "test:api:watch": "vitest"
   },
   "keywords": [],
   "author": "",
@@ -34,9 +36,5 @@
   },
   "prisma": {
     "seed": "node prisma/seed.js"
-  },
-  "scripts": {
-    "test:api": "vitest run",
-    "test:api:watch": "vitest"
-}
+  }
 }

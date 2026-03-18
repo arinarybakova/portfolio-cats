@@ -343,6 +343,349 @@ app.get("/users/:id", authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
+app.put("/me/password", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.id;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        error: "currentPassword and newPassword are required",
+      });
+    }
+
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({
+        error: "New password must be at least 6 characters",
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const passwordMatches = await bcrypt.compare(
+      String(currentPassword),
+      user.password
+    );
+
+    if (!passwordMatches) {
+      return res.status(400).json({ error: "Current password is incorrect" });
+    }
+
+    const hashedPassword = await bcrypt.hash(String(newPassword), 10);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: hashedPassword,
+      },
+    });
+
+    res.json({ message: "Password updated successfully" });
+  } catch (error) {
+    console.error("PUT /me/password error:", error);
+    res.status(500).json({ error: "Failed to update password" });
+  }
+});
+
+app.put("/users/:id/password", authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { newPassword } = req.body;
+
+    if (!id || Number.isNaN(id)) {
+      return res.status(400).json({ error: "Invalid user id" });
+    }
+
+    if (!newPassword) {
+      return res.status(400).json({ error: "newPassword is required" });
+    }
+
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({
+        error: "New password must be at least 6 characters",
+      });
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: { id },
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const hashedPassword = await bcrypt.hash(String(newPassword), 10);
+
+    await prisma.user.update({
+      where: { id },
+      data: {
+        password: hashedPassword,
+      },
+    });
+
+    res.json({ message: "Password updated successfully" });
+  } catch (error) {
+    console.error("PUT /users/:id/password error:", error);
+    res.status(500).json({ error: "Failed to update password" });
+  }
+});
+
+app.get("/me/addresses", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const addresses = await prisma.address.findMany({
+      where: { userId: req.user!.id },
+      orderBy: [
+        { isDefault: "desc" },
+        { createdAt: "desc" },
+      ],
+    });
+
+    res.json(addresses);
+  } catch (error) {
+    console.error("GET /me/addresses error:", error);
+    res.status(500).json({ error: "Failed to fetch addresses" });
+  }
+});
+
+app.get("/users/:id/addresses", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    if (String(req.user?.role).toUpperCase() !== "ADMIN" && req.user?.id !== id) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const addresses = await prisma.address.findMany({
+      where: { userId: id },
+      orderBy: [
+        { isDefault: "desc" },
+        { createdAt: "desc" },
+      ],
+    });
+
+    res.json(addresses);
+  } catch (error) {
+    console.error("GET /users/:id/addresses error:", error);
+    res.status(500).json({ error: "Failed to fetch addresses" });
+  }
+});
+
+app.post("/me/addresses", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const {
+      label,
+      line1,
+      line2,
+      city,
+      state,
+      postalCode,
+      country,
+      isDefault,
+      notes,
+    } = req.body;
+
+    if (!line1 || !city || !country) {
+      return res.status(400).json({
+        error: "line1, city and country are required",
+      });
+    }
+
+    const shouldBeDefault = Boolean(isDefault);
+
+    if (shouldBeDefault) {
+      await prisma.address.updateMany({
+        where: { userId: req.user!.id, isDefault: true },
+        data: { isDefault: false },
+      });
+    }
+
+    const address = await prisma.address.create({
+      data: {
+        label: label || null,
+        line1: String(line1),
+        line2: line2 || null,
+        city: String(city),
+        state: state || null,
+        postalCode: postalCode || null,
+        country: String(country),
+        isDefault: shouldBeDefault,
+        notes: notes || null,
+        userId: req.user!.id,
+      },
+    });
+
+    res.status(201).json(address);
+  } catch (error) {
+    console.error("POST /me/addresses error:", error);
+    res.status(500).json({ error: "Failed to create address" });
+  }
+});
+
+app.post("/users/:id/addresses", authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+    const {
+      label,
+      line1,
+      line2,
+      city,
+      state,
+      postalCode,
+      country,
+      isDefault,
+      notes,
+    } = req.body;
+
+    if (!line1 || !city || !country) {
+      return res.status(400).json({
+        error: "line1, city and country are required",
+      });
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const shouldBeDefault = Boolean(isDefault);
+
+    if (shouldBeDefault) {
+      await prisma.address.updateMany({
+        where: { userId, isDefault: true },
+        data: { isDefault: false },
+      });
+    }
+
+    const address = await prisma.address.create({
+      data: {
+        label: label || null,
+        line1: String(line1),
+        line2: line2 || null,
+        city: String(city),
+        state: state || null,
+        postalCode: postalCode || null,
+        country: String(country),
+        isDefault: shouldBeDefault,
+        notes: notes || null,
+        userId,
+      },
+    });
+
+    res.status(201).json(address);
+  } catch (error) {
+    console.error("POST /users/:id/addresses error:", error);
+    res.status(500).json({ error: "Failed to create address" });
+  }
+});
+
+app.put("/addresses/:addressId", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const addressId = Number(req.params.addressId);
+    const {
+      label,
+      line1,
+      line2,
+      city,
+      state,
+      postalCode,
+      country,
+      isDefault,
+      notes,
+    } = req.body;
+
+    const existing = await prisma.address.findUnique({
+      where: { id: addressId },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: "Address not found" });
+    }
+
+    const isAdminUser = String(req.user?.role).toUpperCase() === "ADMIN";
+    const isOwner = existing.userId === req.user?.id;
+
+    if (!isAdminUser && !isOwner) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    if (isDefault === true) {
+      await prisma.address.updateMany({
+        where: {
+          userId: existing.userId,
+          isDefault: true,
+          id: { not: addressId },
+        },
+        data: { isDefault: false },
+      });
+    }
+
+    const data: any = {};
+
+    if (label !== undefined) data.label = label;
+    if (line1 !== undefined) data.line1 = line1;
+    if (line2 !== undefined) data.line2 = line2;
+    if (city !== undefined) data.city = city;
+    if (state !== undefined) data.state = state;
+    if (postalCode !== undefined) data.postalCode = postalCode;
+    if (country !== undefined) data.country = country;
+    if (typeof isDefault === "boolean") data.isDefault = isDefault;
+    if (notes !== undefined) data.notes = notes;
+
+    const updated = await prisma.address.update({
+      where: { id: addressId },
+      data,
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error("PUT /addresses/:addressId error:", error);
+    res.status(500).json({ error: "Failed to update address" });
+  }
+});
+
+app.delete("/addresses/:addressId", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const addressId = Number(req.params.addressId);
+
+    const existing = await prisma.address.findUnique({
+      where: { id: addressId },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: "Address not found" });
+    }
+
+    const isAdminUser = String(req.user?.role).toUpperCase() === "ADMIN";
+    const isOwner = existing.userId === req.user?.id;
+
+    if (!isAdminUser && !isOwner) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    await prisma.address.delete({
+      where: { id: addressId },
+    });
+
+    res.json({ message: "Address deleted successfully" });
+  } catch (error) {
+    console.error("DELETE /addresses/:addressId error:", error);
+    res.status(500).json({ error: "Failed to delete address" });
+  }
+});
+
 app.put("/users/:id", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const id = Number(req.params.id);
