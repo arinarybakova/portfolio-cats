@@ -611,12 +611,12 @@ export default function CatsList() {
       <div className="cats-page">
         <div className="cats-shell">
           <div className="hero">
-            <div className="badge">{admin ? "Premium Cats Dashboard" : "My Cats"}</div>
+            <div className="badge">{admin ? "Cats Dashboard" : "My Cats"}</div>
             <h1 className="page-title">{admin ? "Cats Collection" : "Owned Cats"}</h1>
             <p className="page-subtitle">
               {admin
-                ? "Manage all cats, filter quickly, and keep the same functionality with a polished premium interface."
-                : "Browse and filter only the cats owned by your account in the same polished premium interface."}
+                ? "Manage all cats, filter quickly, and keep the same functionality with a interface."
+                : "Browse and filter only the cats owned by your account in the same interface."}
             </p>
           </div>
 

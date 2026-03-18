@@ -314,11 +314,11 @@ export default function Login() {
         <div className="auth-shell">
           <div className="hero-panel">
             <div>
-              <div className="hero-badge">Premium Cat Shelter Access</div>
+              <div className="hero-badge">Cat Shelter Access</div>
               <h1 className="hero-title">Welcome back to your adoption hub.</h1>
               <p className="hero-subtitle">
                 Log in as a user or admin and continue managing cats, owners,
-                breeds, and dashboard insights in one premium workspace.
+                breeds, and dashboard insights in one workspace.
               </p>
 
               <div className="hero-stats">

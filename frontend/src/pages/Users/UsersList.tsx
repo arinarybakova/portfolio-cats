@@ -445,7 +445,7 @@ export default function UsersList() {
       <div className="users-page">
         <div className="users-shell">
           <div className="hero">
-            <div className="badge">Premium Users Dashboard</div>
+            <div className="badge">Users Dashboard</div>
             <h1 className="page-title">Users List</h1>
             <p className="page-subtitle">
               Manage users with a polished interface and open a dedicated details view for user

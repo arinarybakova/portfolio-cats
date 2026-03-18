@@ -130,7 +130,7 @@ export default function Intro() {
         <div className="intro-shell">
           <div className="hero">
             <div className="hero-left">
-              <div className="badge">Premium Cat Shelter Platform</div>
+              <div className="badge">Cat Shelter Platform</div>
               <h1 className="title">Role-based shelter management.</h1>
               <p className="subtitle">
                 Guests see this intro page. Admins manage all cats, users, and dashboard data.

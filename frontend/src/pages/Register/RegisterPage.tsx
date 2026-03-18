@@ -262,7 +262,7 @@ export default function Register() {
         <div className="auth-shell">
           <div className="hero-panel">
             <div>
-              <div className="hero-badge">Create Premium Access</div>
+              <div className="hero-badge">Create Access</div>
               <h1 className="hero-title">Join the shelter platform in style.</h1>
               <p className="hero-subtitle">
                 Register a new user or admin account and start managing cats, owners, analytics, and platform activity.
@@ -272,7 +272,7 @@ export default function Register() {
             <div className="hero-grid">
               <div className="hero-card">Create user accounts for adoption flows and profile management.</div>
               <div className="hero-card">Create admin accounts for dashboard insights and full system control.</div>
-              <div className="hero-card">Same premium UI language as the rest of the platform for a polished experience.</div>
+              <div className="hero-card">Same UI language as the rest of the platform for a good experience.</div>
             </div>
           </div>
 

@@ -187,7 +187,7 @@ export default function CatPuzzleGame() {
       const catPrompts = [
         "cute fluffy orange cat, ultra detailed, soft cinematic lighting, centered portrait",
         "adorable white kitten, dreamy glow, highly detailed fur, centered composition",
-        "playful tabby cat, premium studio photo, soft shadows, centered subject",
+        "playful tabby cat, studio photo, soft shadows, centered subject",
         "elegant long hair cat, fantasy lighting, ultra realistic, centered frame",
         "blue eyed kitten, luxury portrait, highly detailed, centered composition",
         "sleepy cat with soft fur, cozy warm light, photorealistic, centered portrait",
@@ -675,7 +675,7 @@ export default function CatPuzzleGame() {
             <div className="cat-glow3" />
 
             <div className="cat-hero">
-              <div className="cat-badge">Premium AI Cat Puzzle</div>
+              <div className="cat-badge">AI Cat Puzzle</div>
               <h1 className="cat-title">Generate. Split. Solve.</h1>
               <p className="cat-subtitle">
                 Create a cat image, turn it into a beautiful puzzle, and drag every piece into the correct place.

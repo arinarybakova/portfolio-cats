@@ -505,12 +505,12 @@ export default function CatDetails() {
       <div className="details-page">
         <div className="details-shell">
           <div className="hero">
-            <div className="badge">{admin ? "Premium Cat Details" : "My Cat Details"}</div>
+            <div className="badge">{admin ? "Cat Details" : "My Cat Details"}</div>
             <h1 className="page-title">Meet {cat.name}</h1>
             <p className="page-subtitle">
               {admin
-                ? "View, edit, assign an owner, and manage this cat without changing the existing functionality."
-                : "View details of your cat in the same premium interface."}
+                ? "View, edit, assign an owner, and manage cat."
+                : "View details of your cat in the same interface."}
             </p>
           </div>
 

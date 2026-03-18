@@ -15,8 +15,7 @@ export async function registerUser(data?: Partial<{
     ...data,
   };
 
-  const res = await api.post("/auth/register", payload);
-
+  const res = await api.post<any>("/auth/register", payload);
   return { res, payload };
 }
 
