@@ -15,17 +15,25 @@ describe('Auth - User Register', () => {
                 role: expect('USER')
             })
         )
-        expect(res.data.user.password).toBeUndefined()
+        expect(res.data.user).not.toHaveProperty('password')
     }
 
     it('fails when name, email and password are missing'), async () => {
-        const res = await api.post('/auth/register', {})
-        expect(res.status).toBe(400)
-        expect(res.data).toEqual({ error: 'Name, email and password are required' })
+        const { res: response }  = await registerUser({email: '', name: '', password: ''})
+        expect(response.status).toBe(400)
+        expect(response.data).toEqual({ error: 'Name, email and password are required'})
     }
 
-    it('fails when the email structure is incorrect'), async () => {}
-    it('fails when user is already registered'), async () => {}
+    it('fails when the email structure is incorrect'), async () => {
+        const { res: response } = await registerUser({email: 'test.gmail'})
+        expect(response.status).toBe(400)
+    }
+
+    it('fails when user is already registered'), async () => {
+        const { res: response } = await registerUser()
+        expect(response.status).toBe(400)
+        expect(response).toEqual({ error: 'Email is already registered'})
+    }
 })
 
 describe('Auth - User Login', () => {

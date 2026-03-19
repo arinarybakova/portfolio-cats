@@ -243,6 +243,8 @@ export default function Register() {
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
+      window.dispatchEvent(new Event("authChanged"));
+
       if (String(data.user.role).toUpperCase() === "ADMIN") {
         navigate("/dashboard");
       } else {
