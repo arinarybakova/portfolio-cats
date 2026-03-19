@@ -27,6 +27,7 @@ describe('Auth - User Register', () => {
     it('fails when the email structure is incorrect'), async () => {
         const { res: response } = await registerUser({email: 'test.gmail'})
         expect(response.status).toBe(400)
+        expect(response.data).toEqual({error: 'Please enter a valid email address'})
     }
 
     it('fails when user is already registered'), async () => {

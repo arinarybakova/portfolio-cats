@@ -132,37 +132,46 @@ app.post("/auth/register", async (req, res) => {
     const { name, email, password, role } = req.body;
 
     if (!name || !email || !password) {
-      return res.status(400).json({ error: "Name, email and password are required" });
+      return res.status(400).json({
+        error: "Name, email and password are required",
+      });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({
+        error: "Please enter a valid email address",
+      });
     }
 
     const existingUser = await prisma.user.findUnique({
-      where: { email: String(email).toLowerCase() },
+      where: { email: normalizedEmail },
     });
 
     if (existingUser) {
-      return res.status(400).json({ error: "Email is already registered" });
+      return res.status(400).json({
+        error: "Email is already registered",
+      });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const safeRole = String(role || "USER").toUpperCase() === "ADMIN" ? "ADMIN" : "USER";
+    const safeRole =
+      String(role || "USER").toUpperCase() === "ADMIN" ? "ADMIN" : "USER";
 
     const user = await prisma.user.create({
       data: {
-        name,
-        email: String(email).toLowerCase(),
+        name: String(name).trim(),
+        email: normalizedEmail,
         password: hashedPassword,
         role: safeRole as any,
       },
     });
 
-    const token = createToken({
-      id: user.id,
-      email: user.email,
-      role: String(user.role),
-    });
-
     res.status(201).json({
-      token,
+      message: "User registered successfully",
       user: {
         id: user.id,
         name: user.name,
@@ -192,6 +201,7 @@ app.post("/auth/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
+    const normalizedEmail = String(email).trim().toLowerCase();
     const passwordMatches = await bcrypt.compare(password, user.password);
 
     if (!passwordMatches) {
@@ -200,6 +210,14 @@ app.post("/auth/login", async (req, res) => {
 
     if (role && String(role).toUpperCase() !== String(user.role).toUpperCase()) {
       return res.status(401).json({ error: "Selected account type does not match this user" });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({
+        error: "Please enter a valid email address",
+      });
     }
 
     const token = createToken({
