@@ -220,14 +220,7 @@ app.post("/auth/login", async (req, res) => {
       });
     }
 
-    const token = createToken({
-      id: user.id,
-      email: user.email,
-      role: String(user.role),
-    });
-
     res.json({
-      token,
       user: {
         id: user.id,
         name: user.name,
