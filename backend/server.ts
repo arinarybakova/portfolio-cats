@@ -749,6 +749,8 @@ app.delete("/users/:id", authMiddleware, requireAdmin, async (req, res) => {
     console.error("DELETE /users error:", error);
     res.status(500).json({ error: "Failed to delete user" });
   }
+
+  
 });
 
 /* =======================================================

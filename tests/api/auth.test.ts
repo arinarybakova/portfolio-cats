@@ -1,19 +1,18 @@
 import { describe, it, expect } from "vitest"
 import { api } from "../http/client.ts"
-import { loginUser, registerUser, authHeader } from "./helpers.ts"
+import { loginUser, registerUser} from "./utils.ts/userHelper.ts"
 
 describe('Auth - User Register', () => {
     it("registers a new user successfully", async () => {
-        const { res, payload } = await registerUser();
-
+        const { res, payload } = await registerUser()
+        const data = res.data as any
         expect(res.status).toBe(201);
-        expect(res.data).not.toHaveProperty("token");
-
-        expect(res.data).toHaveProperty("user");
-        expect(res.data.user.id).toBeTypeOf("number");
-        expect(res.data.user.name).toBe(payload.name);
-        expect(res.data.user.email).toBe(payload.email.toLowerCase());
-        expect(res.data.user.role).toBe("USER");
+        expect(data).not.toHaveProperty("token")
+        expect(data).toHaveProperty("user")
+        expect(data.user.id).toBeTypeOf("number")
+        expect(data.user.name).toBe(payload.name)
+        expect(data.user.email).toBe(payload.email.toLowerCase())
+        expect(data.user.role).toBe("USER")
         });
 
     it('fails when name, email and password are missing', async () => {
@@ -89,6 +88,5 @@ describe('Auth - User Login', () => {
         })
         expect(response.status).toBe(401)
         expect(response.data).toEqual({error: 'Invalid email or password'})
-
      })
 })
