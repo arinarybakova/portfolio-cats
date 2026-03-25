@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { api } from "../http/client";
 import { loginUser, authHeader } from "./utils.ts/userHelper";
 import { createUserAndToken } from "./utils.ts/userHelper";
+import { generateExpiredToken, generateToken } from "./utils.ts/jwtHelper";
 
 describe("Users - Delete", () => {
   it("rejects delete request without authentication", async () => {
@@ -75,14 +76,32 @@ describe("Users - Delete", () => {
     expect(res.status).toBe(500);
     expect(res.data).toEqual({ error: "Failed to delete user" });
   });
+
+  it("rejects delete request with expired token", async () => {
+    const { user } = await createUserAndToken("ADMIN");
+
+    const expiredToken = generateExpiredToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    });
+
+    const res = await api.delete(`/users/${user.id}`, {
+      headers: authHeader(expiredToken),
+    });
+
+    expect(res.status).toBe(401);
+    expect(res.data).toEqual({ error: "Invalid or expired token" });
+  });
+
 });
 
 describe('Users - Get by ID', () => {
 
-  it('rejects request without authentication', async () => { 
+  it('rejects request without authentication', async () => {
     const res = await api.get("/users/1")
     expect(res.status).toBe(401)
-    expect(res.data).toEqual({ error: 'Unauthorized'})
+    expect(res.data).toEqual({ error: 'Unauthorized' })
   })
 
   it('rejects request with invalid token', async () => {
@@ -90,8 +109,8 @@ describe('Users - Get by ID', () => {
       headers: authHeader("invalid-token")
     })
     expect(res.status).toBe(401)
-    expect(res.data).toEqual({ error: 'Invalid or expired token'})
-   })
+    expect(res.data).toEqual({ error: 'Invalid or expired token' })
+  })
 
   it('allows a user to fetch their own profile', async () => {
     const { user, token } = await createUserAndToken("USER");
@@ -106,8 +125,8 @@ describe('Users - Get by ID', () => {
     })
     expect(res.data).not.toHaveProperty('password')
     expect(res.data).toHaveProperty('cats')
-   })
-   
+  })
+
   it('rejects a user fetching another user profile', async () => {
     const { token } = await createUserAndToken("USER");
     const { user: otherUser } = await createUserAndToken("USER");
@@ -115,10 +134,10 @@ describe('Users - Get by ID', () => {
       headers: authHeader(token),
     });
     expect(res.status).toBe(403)
-    expect(res.data).toEqual({ error: 'Access denied'})
-   })
+    expect(res.data).toEqual({ error: 'Access denied' })
+  })
 
-  it('allows an admin to fetch any user profile', async () => { 
+  it('allows an admin to fetch any user profile', async () => {
     const { user: user } = await createUserAndToken("USER");
     const { token: adminToken } = await createUserAndToken("ADMIN");
     const res = await api.get(`/users/${user.id}`, {
@@ -131,32 +150,91 @@ describe('Users - Get by ID', () => {
     });
     expect(res.data).not.toHaveProperty('password')
     expect(res.data).toHaveProperty('cats')
-   })
   })
+})
 
-  it('returns 404 when the requested user does not exist', async () => { 
-     const res = await api.get("/users/111213133131", {
-      headers: authHeader("invalid-token")
-    })
-    expect(res.status).toBe(401)
-    expect(res.data).toEqual({ error: 'Invalid or expired token'})
-   })
+it('returns 404 when the requested user does not exist', async () => {
+  const res = await api.get("/users/111213133131", {
+    headers: authHeader("invalid-token")
+  })
+  expect(res.status).toBe(401)
+  expect(res.data).toEqual({ error: 'Invalid or expired token' })
+})
 
-  it('handles non-numeric user id safely', async () => {
-    const { token: adminToken } = await createUserAndToken("ADMIN");
+it('handles non-numeric user id safely', async () => {
+  const { token: adminToken } = await createUserAndToken("ADMIN");
 
-    const res = await api.get("/users/testTest", {
-      headers: authHeader(adminToken),
-    });
+  const res = await api.get("/users/testTest", {
+    headers: authHeader(adminToken),
+  });
 
-    expect(res.status).toBe(500);
-    expect(res.data).toEqual({ error: "Failed to fetch user" })
+  expect(res.status).toBe(500);
+  expect(res.data).toEqual({ error: "Failed to fetch user" })
+})
+
+it("rejects expired token", async () => {
+  const { user } = await createUserAndToken("USER");
+
+  const expiredToken = generateExpiredToken({
+    id: user.id,
+    email: user.email,
+    role: user.role,
+  });
+
+  const res = await api.get(`/users/${user.id}`, {
+    headers: authHeader(expiredToken),
+  });
+
+  expect(res.status).toBe(401);
+  expect(res.data).toEqual({ error: "Invalid or expired token" });
 });
 
 describe('Users - Get All', () => {
-  it('rejects request without authentication', async () => { });
-  it('rejects request with invalid token', async () => { });
-  it('rejects a normal user from fetching all users', async () => { });
-  it('allows an admin to fetch all users', async () => { });
-  it('does not return password fields in the users list', async () => { });
+
+  it('rejects request without authentication', async () => {
+    const res = await api.get('/users')
+    expect(res.status).toBe(401)
+    expect(res.data).toEqual({ error: 'Unauthorized' })
+  });
+
+  it('rejects request with invalid token', async () => {
+    const res = await api.get('/users')
+    expect(res.status).toBe(401)
+    expect(res.data).toEqual({ error: 'Unauthorized' })
+  });
+
+  it("rejects request expired token", async () => {
+    const { user } = await createUserAndToken('ADMIN');
+
+    const expiredToken = generateExpiredToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    });
+
+    const res = await api.get('/users', {
+      headers: authHeader(expiredToken),
+    });
+
+    expect(res.status).toBe(401);
+    expect(res.data).toEqual({ error: "Invalid or expired token" });
+  });
+
+  it('rejects a user from fetching all users', async () => {
+    const { token: userToken } = await createUserAndToken("USER")
+    const res = await api.get('/users', {
+      headers: authHeader(userToken)
+    })
+    expect(res.status).toBe(403)
+    expect(res.data).toEqual({ error: "Admin access required" })
+
+  });
+  it('allows an admin to fetch all users', async () => {
+    const { token: adminToken } = await createUserAndToken('ADMIN')
+    const res = await api.get('/users', {
+      headers: authHeader(adminToken)
+    })
+    expect(res.status).toBe(200)
+    expect(res.data).toEqual(expect.arrayContaining([expect.objectContaining({ role: 'ADMIN' })]))
+  });
 });
