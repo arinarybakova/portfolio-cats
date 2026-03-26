@@ -34,24 +34,27 @@ export async function loginUser(data: {
 }
 
 export async function createUserAndToken(role: "USER" | "ADMIN") {
-  const hashedPassword = await bcrypt.hash(password, 10);
+  const plainPassword = "Test123456"
+  const hashedPassword = await bcrypt.hash(plainPassword, 10)
+
+  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 
   const user = await prisma.user.create({
     data: {
       name: `${role} Test`,
-      email: `${role.toLowerCase()}-${Date.now()}@test.com`,
+      email: `${role.toLowerCase()}-${unique}@test.com`,
       password: hashedPassword,
       role,
     },
-  });
+  })
 
   const token = generateToken({
     id: user.id,
     email: user.email,
     role: user.role,
-  });
+  })
 
-  return { user, password, token };
+  return { user, plainPassword, token }
 }
 
 export function authHeader(token: string) {

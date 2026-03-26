@@ -35,7 +35,7 @@ describe("Users - Delete", () => {
 
   it("allows an admin to delete another user and checks if user cannot login", async () => {
     const { token: adminToken } = await createUserAndToken("ADMIN");
-    const { user, password } = await createUserAndToken("USER");
+    const { user, plainPassword } = await createUserAndToken("USER");
 
     const deleteRes = await api.delete(`/users/${user.id}`, {
       headers: authHeader(adminToken),
@@ -46,7 +46,7 @@ describe("Users - Delete", () => {
 
     const loginRes = await loginUser({
       email: user.email,
-      password,
+      password: plainPassword,
     });
 
     expect(loginRes.status).toBe(401);
@@ -65,7 +65,7 @@ describe("Users - Delete", () => {
     expect(res.status).toBe(500);
     expect(res.data).toEqual({ error: "Failed to delete user" });
   });
-
+  
   it("handles non-numeric user id safely", async () => {
     const { token: adminToken } = await createUserAndToken("ADMIN");
 
