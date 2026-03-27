@@ -187,52 +187,59 @@ app.post("/auth/register", async (req, res) => {
 
 app.post("/auth/login", async (req, res) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password, role } = req.body
 
     if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
+      return res.status(400).json({ error: "Email and password are required" })
     }
 
     const user = await prisma.user.findUnique({
       where: { email: String(email).toLowerCase() },
-    });
+    })
 
     if (!user) {
-      return res.status(401).json({ error: "Invalid email or password" });
+      return res.status(401).json({ error: "Invalid email or password" })
     }
 
-    const normalizedEmail = String(email).trim().toLowerCase();
-    const passwordMatches = await bcrypt.compare(password, user.password);
+    const normalizedEmail = String(email).trim().toLowerCase()
+    const passwordMatches = await bcrypt.compare(password, user.password)
 
     if (!passwordMatches) {
-      return res.status(401).json({ error: "Invalid email or password" });
+      return res.status(401).json({ error: "Invalid email or password" })
     }
 
     if (role && String(role).toUpperCase() !== String(user.role).toUpperCase()) {
-      return res.status(401).json({ error: "Selected account type does not match this user" });
+      return res.status(401).json({ error: "Selected account type does not match this user" })
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
     if (!emailRegex.test(normalizedEmail)) {
       return res.status(400).json({
         error: "Please enter a valid email address",
-      });
+      })
     }
 
+    const token = createToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    })
+
     res.json({
+      token,
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
       },
-    });
+    })
   } catch (error) {
-    console.error("POST /auth/login error:", error);
-    res.status(500).json({ error: "Failed to login" });
+    console.error("POST /auth/login error:", error)
+    res.status(500).json({ error: "Failed to login" })
   }
-});
+})
 
 app.get("/auth/me", authMiddleware, async (req: AuthRequest, res) => {
   try {
