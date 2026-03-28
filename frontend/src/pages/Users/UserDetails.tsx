@@ -733,10 +733,18 @@ export default function UserDetails() {
     return countries.sort((a, b) => a.name.localeCompare(b.name));
   }, []);
 
-  const getAuthHeaders = (withJson = false): HeadersInit => ({
+  const getAuthHeaders = (withJson = false): HeadersInit => {
+  const token = localStorage.getItem("token")
+
+  if (!token) {
+    throw new Error("Missing authentication token")
+  }
+
+  return {
     ...(withJson ? { "Content-Type": "application/json" } : {}),
     Authorization: `Bearer ${token}`,
-  });
+  }
+}
 
   const resetAddressForm = () => {
     setAddressForm(emptyAddressForm);
@@ -801,6 +809,7 @@ export default function UserDetails() {
       ? `http://localhost:5000/users/${id}`
       : "http://localhost:5000/me";
 
+      
     const res = await fetch(url, {
       headers: getAuthHeaders(),
     });

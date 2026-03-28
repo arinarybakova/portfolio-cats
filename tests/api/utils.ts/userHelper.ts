@@ -62,3 +62,26 @@ export function authHeader(token: string) {
     Authorization: `Bearer ${token}`,
   };
 }
+
+export async function getTokenByEmail(email: string) {
+  const user = await prisma.user.findUnique({
+    where: {
+      email: email.toLowerCase(),
+    },
+  })
+
+  if (!user) {
+    throw new Error(`User not found for email: ${email}`)
+  }
+
+  const token = generateToken({
+    id: user.id,
+    email: user.email,
+    role: user.role,
+  })
+
+  return {
+    user,
+    token,
+  }
+}
