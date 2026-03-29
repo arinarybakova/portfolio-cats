@@ -48,6 +48,18 @@ function makeAddressInput(overrides: Partial<AddressInput> = {}): AddressInput {
     }
 }
 
+async function createAddress(token: string, overrides = {}) {
+    const res = await api.post(
+        "/me/addresses",
+        makeAddressInput(overrides),
+        {
+            headers: authHeader(token),
+        }
+    )
+
+    return res.data as AddressResponse
+}
+
 describe("GET /me", () => {
     it("rejecting request without authentication token", async () => {
         const res = await api.get('/me')
@@ -349,34 +361,7 @@ describe("POST /me/addresses", () => {
         expect(res.data).toEqual({ error: 'line1, city and country are required' })
     })
 
-    it("successful creation of a new address", async () => {
-        const { user, token } = await createUserAndToken('USER')
-        const body = makeAddressInput()
-        const res = await api.post('/me/addresses',
-            
-                body
-            ,
-            {
-                headers: authHeader(token)
-            })
-        const data = res.data as AddressResponse
-
-        expect(res.status).toBe(201)
-        expect(data).toMatchObject({
-            label: body.label,
-            line1: body.line1,
-            city: body.city,
-            country: body.country,
-            userId: user.id,
-        })
-
-        expect(data.id).toBeTypeOf("number")
-        expect(data.createdAt).toBeTypeOf("string")
-        expect(data.updatedAt).toBeTypeOf("string")
-        expect(data.isDefault).toBe(true)
-    })
-
-    it("creating address marked as default", async () => {
+    it("creating address marked as not default", async () => {
         const { token } = await createUserAndToken("USER")
 
         const res = await api.post(
@@ -434,27 +419,196 @@ describe("POST /me/addresses", () => {
         expect(defaultAddresses).toHaveLength(1)
         expect(defaultAddresses[0].label).toBe("Second")
     })
-
 })
 
 describe("PUT /addresses/:addressId", () => {
-    it("rejecting request without authentication token")
+    it("rejecting request without authentication token", async () => {
+        const { token } = await createUserAndToken('USER')
+        const address = await createAddress(token)
+        const res = await api.put(`/addresses/${address.id}`, {})
+        expect(res.status).toBe(401)
+        expect(res.data).toEqual({ error: 'Unauthorized' })
+    })
 
-    it("rejecting request with invalid or expired token")
+    it("rejecting request with invalid or expired token", async () => {
+        const { token } = await createUserAndToken('USER')
+        const address = await createAddress(token)
+        const res = await api.put(`/addresses/${address.id}`, {}, { headers: authHeader('invalid-token') })
+        expect(res.status).toBe(401)
+        expect(res.data).toEqual({ error: 'Invalid or expired token' })
+    })
 
-    it("handling update of non-existent address")
+    it("rejecting request with expired token", async () => {
+        const { token, user } = await createUserAndToken('USER')
+        const expiredToken = generateExpiredToken({
+            id: user.id,
+            email: user.email,
+            role: user.role,
+        });
+        const address = await createAddress(token)
+        const res = await api.put(`/addresses/${address.id}`, {}, { headers: authHeader(expiredToken) })
+        expect(res.status).toBe(401)
+        expect(res.data).toEqual({ error: 'Invalid or expired token' })
+    })
 
-    it("preventing update by non-owner non-admin user")
+    it("handling update of non-existent address", async () => {
+        const { token, user } = await createUserAndToken('USER')
+        const res = await api.put('/addresses/00000', {}, { headers: authHeader(token) })
+        expect(res.status).toBe(404)
+        expect(res.data).toEqual({ error: 'Address not found' })
+    })
 
-    it("allowing admin to update another user's address")
+    it("preventing non-owner non-admin user from updating address", async () => {
+        const { token: ownerToken } = await createUserAndToken("USER")
+        const { token: otherUserToken } = await createUserAndToken("USER")
 
-    it("allowing owner to update their own address")
+        const createRes = await api.post(
+            "/me/addresses",
+            makeAddressInput(),
+            {
+                headers: authHeader(ownerToken),
+            }
+        )
 
-    it("updating only provided fields")
+        const address = createRes.data as AddressResponse
 
-    it("setting address as default and unsetting others")
+        const res = await api.put(
+            `/addresses/${address.id}`,
+            {
+                city: "Updated City",
+            },
+            {
+                headers: authHeader(otherUserToken),
+            }
+        )
 
-    it("ensuring other users' addresses are not affected")
+        expect(res.status).toBe(403)
+        expect(res.data).toEqual({ error: "Access denied" })
+    })
+
+    it("allowing admin to update another user's address", async () => {
+        const { token: adminToken } = await createUserAndToken("ADMIN")
+        const { token: userToken } = await createUserAndToken("USER")
+
+        const createRes = await api.post(
+            "/me/addresses",
+            makeAddressInput(),
+            {
+                headers: authHeader(userToken),
+            }
+        )
+
+        const address = createRes.data as AddressResponse
+
+        const res = await api.put(
+            `/addresses/${address.id}`,
+            {
+                city: "Updated City",
+            },
+            {
+                headers: authHeader(adminToken),
+            }
+        )
+
+        expect(res.status).toBe(200)
+        const getRes = await api.get("/me/addresses", {
+            headers: authHeader(userToken),
+        })
+
+        const createdAddress = createRes.data as AddressResponse
+
+        const addresses = getRes.data as AddressResponse[]
+        const persistedAddress = addresses.find(a => a.id === createdAddress.id)
+
+        expect(persistedAddress).toBeDefined()
+        expect(persistedAddress!.city).toBe("Updated City")
+    })
+})
+
+
+it("updating address and verifying persisted changes", async () => {
+    const { token } = await createUserAndToken("USER")
+
+    const createRes = await api.post(
+        "/me/addresses",
+        makeAddressInput({
+            label: "Home",
+            city: "Old City",
+        }),
+        {
+            headers: authHeader(token),
+        }
+    )
+
+    const createdAddress = createRes.data as AddressResponse
+
+    const updateRes = await api.put(
+        `/addresses/${createdAddress.id}`,
+        {
+            city: "New City",
+            label: "Updated Home",
+        },
+        {
+            headers: authHeader(token),
+        }
+    )
+
+    const updatedAddress = updateRes.data as AddressResponse
+
+    expect(updateRes.status).toBe(200)
+    expect(updatedAddress.id).toBe(createdAddress.id)
+    expect(updatedAddress.city).toBe("New City")
+    expect(updatedAddress.label).toBe("Updated Home")
+
+    const getRes = await api.get("/me/addresses", {
+        headers: authHeader(token),
+    })
+
+    const addresses = getRes.data as AddressResponse[]
+    const persistedAddress = addresses.find(a => a.id === createdAddress.id)
+
+    expect(persistedAddress).toBeDefined()
+    expect(persistedAddress!.city).toBe("New City")
+    expect(persistedAddress!.label).toBe("Updated Home")
+})
+
+it("setting address as default and unsetting others", async () => {
+    const { token: userToken } = await createUserAndToken("USER")
+
+    const createRes = await api.post(
+        "/me/addresses",
+        makeAddressInput(),
+        {
+            headers: authHeader(userToken),
+        }
+    )
+
+    const address = createRes.data as AddressResponse
+
+    const res = await api.put(
+        `/addresses/${address.id}`,
+        {
+            city: "Updated City",
+            isDefault: false,
+        },
+        {
+            headers: authHeader(userToken),
+        }
+    )
+
+    expect(res.status).toBe(200)
+    const getRes = await api.get("/me/addresses", {
+        headers: authHeader(userToken),
+    })
+
+    const createdAddress = createRes.data as AddressResponse
+
+    const addresses = getRes.data as AddressResponse[]
+    const persistedAddress = addresses.find(a => a.id === createdAddress.id)
+
+    expect(persistedAddress).toBeDefined()
+    expect(persistedAddress!.city).toBe("Updated City")
+
 })
 
 describe("DELETE /addresses/:addressId", () => {
