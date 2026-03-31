@@ -612,17 +612,116 @@ it("setting address as default and unsetting others", async () => {
 })
 
 describe("DELETE /addresses/:addressId", () => {
-    it("rejecting request without authentication token")
+    it("rejecting request without authentication token", async () => {
+        const { token } = await createUserAndToken('USER')
+        const address = await createAddress(token)
+        const res = await api.delete(`/addresses/${address.id}`)
+        expect(res.status).toBe(401)
+        expect(res.data).toEqual({ error: 'Unauthorized' })
+    })
 
-    it("rejecting request with invalid or expired token")
+    it("rejecting request with invalid token", async () => {
+        const { token } = await createUserAndToken('USER')
+        const address = await createAddress(token)
+        const res = await api.delete(`/addresses/${address.id}`,
+            {
+                headers: authHeader('invalid-token')
+            })
+        expect(res.status).toBe(401)
+        expect(res.data).toEqual({ error: 'Invalid or expired token' })
+    })
 
-    it("handling deletion of non-existent address")
+    it("rejecting request with expired token", async () => {
+        const { user, token } = await createUserAndToken('USER')
+        const address = await createAddress(token)
+        const expiredToken = await generateExpiredToken({
+            id: user.id,
+            email: user.email,
+            role: user.role
+        })
+        const res = await api.delete(`/addresses/${address.id}`,
+            {
+                headers: authHeader(expiredToken)
+            })
+        expect(res.status).toBe(401)
+        expect(res.data).toEqual({ error: 'Invalid or expired token' })
+    })
 
-    it("preventing deletion by non-owner non-admin user")
+    it("handling deletion of non-existent address", async () => {
+        const { token: userToken } = await createUserAndToken('USER')
+        const res = await api.delete(`/addresses/313131`,
+            {
+                headers: authHeader(userToken)
+            })
+        expect(res.status).toBe(404)
+        expect(res.data).toEqual({ error: 'Address not found' })
+    })
 
-    it("allowing admin to delete another user's address")
+    it("preventing deletion by non-owner non-admin user", async () => {
+        const { token: ownerToken } = await createUserAndToken('USER')
+        const { token: otherUserToken } = await createUserAndToken('USER')
+        const address = await createAddress(ownerToken)
+        const res = await api.delete(`/addresses/${address.id}`,
+            {
+                headers: authHeader(otherUserToken)
+            })
+        expect(res.status).toBe(403)
+        expect(res.data).toEqual({ error: 'Access denied' })
+    })
 
-    it("successful deletion by address owner")
+    it("allowing admin to delete another user's address", async () => {
+        const { token: ownerToken } = await createUserAndToken('USER')
+        const { token: adminToken } = await createUserAndToken('ADMIN')
+        const address = await createAddress(ownerToken)
+        const res = await api.delete(`/addresses/${address.id}`,
+            {
+                headers: authHeader(adminToken)
+            })
+        expect(res.status).toBe(200)
+        expect(res.data).toEqual({ message: 'Address deleted successfully' })
+        const getRes = await api.get('/me/addresses', {
+            headers: authHeader(ownerToken)
+        })
+        const addresses = getRes.data as AddressResponse[]
+        const deletedAddress = addresses.find(a => a.id === address.id)
+        expect(deletedAddress).toBeUndefined()
+    })
 
-    it("ensuring other users' addresses are not deleted")
+    it("successful deletion by address owner", async () => {
+        const { token: userToken } = await createUserAndToken('USER')
+        const address = await createAddress(userToken)
+        const res = await api.delete(`/addresses/${address.id}`,
+            {
+                headers: authHeader(userToken)
+            })
+        expect(res.status).toBe(200)
+        expect(res.data).toEqual({ message: 'Address deleted successfully' })
+        const getRes = await api.get('/me/addresses', {
+            headers: authHeader(userToken)
+        })
+        const addresses = getRes.data as AddressResponse[]
+        const deletedAddress = addresses.find(a => a.id === address.id)
+        expect(deletedAddress).toBeUndefined()
+    })
+
+    it("ensuring other users' addresses are not deleted", async () => {
+        const { token: userToken } = await createUserAndToken('USER')
+        const firstAddress = await createAddress(userToken)
+        const secondAddress = await createAddress(userToken)
+        const res = await api.delete(`/addresses/${firstAddress.id}`,
+            {
+                headers: authHeader(userToken)
+            })
+        expect(res.status).toBe(200)
+        expect(res.data).toEqual({ message: 'Address deleted successfully' })
+         const getRes = await api.get('/me/addresses', {
+            headers: authHeader(userToken)
+        })
+        const addresses = getRes.data as AddressResponse[]
+        const presistedAddress = addresses.find(a => a.id === secondAddress.id)
+        const deletedAddress = addresses.find(a => a.id === firstAddress.id)
+
+        expect(deletedAddress).toBeUndefined()
+        expect(presistedAddress).toBeDefined()
+    })
 })
