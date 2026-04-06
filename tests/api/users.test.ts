@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { api } from "../http/client";
 import { loginUser, authHeader } from "./utils.ts/userHelper";
 import { createUserAndToken } from "./utils.ts/userHelper";
-import { generateExpiredToken, generateToken } from "./utils.ts/jwtHelper";
+import { generateExpiredToken } from "./utils.ts/jwtHelper";
 
 describe("Users - Delete", () => {
   it("rejects delete request without authentication", async () => {

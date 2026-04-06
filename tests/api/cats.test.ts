@@ -1,10 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { api } from "../http/client";
-import { loginUser, authHeader } from "./utils.ts/userHelper";
+import { authHeader } from "./utils.ts/userHelper";
 import { createUserAndToken } from "./utils.ts/userHelper";
 import { generateExpiredToken, generateToken } from "./utils.ts/jwtHelper";
-import { param } from "framer-motion/client";
-import { queryObjects } from "node:v8";
 
 async function createCatForTests(
     adminToken: string,

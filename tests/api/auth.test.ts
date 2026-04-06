@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest"
-import { api } from "../http/client.ts"
 import { loginUser, registerUser} from "./utils.ts/userHelper.ts"
 
 describe('Auth - User Register', () => {
