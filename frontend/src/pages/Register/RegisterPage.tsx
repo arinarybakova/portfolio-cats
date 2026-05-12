@@ -265,16 +265,27 @@ export default function Register() {
           <div className="hero-panel">
             <div>
               <div className="hero-badge">Create Access</div>
-              <h1 className="hero-title">Join the shelter platform in style.</h1>
+              <h1 className="hero-title">
+                Join the shelter platform in style.
+              </h1>
               <p className="hero-subtitle">
-                Register a new user or admin account and start managing cats, owners, analytics, and platform activity.
+                Register a new user or admin account and start managing cats,
+                owners, analytics, and platform activity.
               </p>
             </div>
 
             <div className="hero-grid">
-              <div className="hero-card">Create user accounts for adoption flows and profile management.</div>
-              <div className="hero-card">Create admin accounts for dashboard insights and full system control.</div>
-              <div className="hero-card">Same UI language as the rest of the platform for a good experience.</div>
+              <div className="hero-card">
+                Create user accounts for adoption flows and profile management.
+              </div>
+              <div className="hero-card">
+                Create admin accounts for dashboard insights and full system
+                control.
+              </div>
+              <div className="hero-card">
+                Same UI language as the rest of the platform for a good
+                experience.
+              </div>
             </div>
           </div>
 
@@ -283,7 +294,8 @@ export default function Register() {
               <div className="form-badge">Create Account</div>
               <h2 className="form-title">Register</h2>
               <p className="form-subtitle">
-                Pick the account type, fill in your details, and create access instantly.
+                Pick the account type, fill in your details, and create access
+                instantly.
               </p>
 
               <div className="tabs">
@@ -340,13 +352,28 @@ export default function Register() {
                   />
                 </div>
 
-                {error ? <div className="error-box">{error}</div> : null}
+                {error ? (
+                  <div className="error-box" data-testid="register-error">
+                    {error}
+                  </div>
+                ) : null}
 
-                <button className="btn" type="submit" disabled={loading} data-testid="register-submit">
-                  {loading ? "Creating Account..." : `Register as ${role === "ADMIN" ? "Admin" : "User"}`}
+                <button
+                  className="btn"
+                  type="submit"
+                  disabled={loading}
+                  data-testid="register-submit"
+                >
+                  {loading
+                    ? "Creating Account..."
+                    : `Register as ${role === "ADMIN" ? "Admin" : "User"}`}
                 </button>
 
-                <button type="button" className="btn-outline" onClick={() => navigate("/")}>
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={() => navigate("/")}
+                >
                   Back to Home
                 </button>
               </form>

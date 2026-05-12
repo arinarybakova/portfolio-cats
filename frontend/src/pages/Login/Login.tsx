@@ -403,7 +403,11 @@ export default function Login() {
                   />
                 </div>
 
-                {error ? <div className="error-box">{error}</div> : null}
+                {error ? (
+                  <div className="error-box" data-testid="login-error">
+                    {error}
+                  </div>
+                ) : null}
 
                 <button
                   className="btn"
