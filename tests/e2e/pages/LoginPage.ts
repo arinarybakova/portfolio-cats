@@ -20,6 +20,10 @@ export class LoginPage {
     await this.submitButton().click();
   }
 
+  async goto() {
+    await this.page.goto('/login');
+  }
+
   async expectErrorMessage(message: string) {
     await expect(this.errorMessage()).toBeVisible({ timeout: 10_000 });
     await expect(this.errorMessage()).toHaveText(message);

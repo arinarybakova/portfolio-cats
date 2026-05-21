@@ -348,7 +348,13 @@ const PAGE_STYLES = `
   }
 `;
 
-const CatRow = memo(function CatRow({ cat, admin, onEdit, onDelete, onOpen }: CatRowProps) {
+const CatRow = memo(function CatRow({
+  cat,
+  admin,
+  onEdit,
+  onDelete,
+  onOpen,
+}: CatRowProps) {
   return (
     <tr className={`table-row ${cat.priority ? "priority-row" : ""}`}>
       <td>
@@ -364,7 +370,12 @@ const CatRow = memo(function CatRow({ cat, admin, onEdit, onDelete, onOpen }: Ca
       </td>
       <td>
         {cat.image ? (
-          <img src={cat.image} alt={cat.name} className="thumb" loading="lazy" />
+          <img
+            src={cat.image}
+            alt={cat.name}
+            className="thumb"
+            loading="lazy"
+          />
         ) : (
           <span style={{ color: "#94a3b8" }}>No image</span>
         )}
@@ -446,7 +457,7 @@ export default function CatsList() {
       setLoading(true);
 
       const query = new URLSearchParams(
-        Object.entries(filters).filter(([_, value]) => value !== "")
+        Object.entries(filters).filter(([_, value]) => value !== ""),
       ).toString();
 
       const baseUrl = admin
@@ -508,8 +519,9 @@ export default function CatsList() {
   const totalPages = Math.max(1, Math.ceil(cats.length / itemsPerPage));
 
   const paginatedCats = useMemo(
-    () => cats.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
-    [cats, currentPage]
+    () =>
+      cats.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
+    [cats, currentPage],
   );
 
   const handleCreate = async () => {
@@ -612,7 +624,9 @@ export default function CatsList() {
         <div className="cats-shell">
           <div className="hero">
             <div className="badge">{admin ? "Cats Dashboard" : "My Cats"}</div>
-            <h1 className="page-title">{admin ? "Cats Collection" : "Owned Cats"}</h1>
+            <h1 className="page-title">
+              {admin ? "Cats Collection" : "Owned Cats"}
+            </h1>
             <p className="page-subtitle">
               {admin
                 ? "Manage all cats, filter quickly, and keep the same functionality with a interface."
@@ -631,17 +645,22 @@ export default function CatsList() {
           <div className="panel filters-card">
             <div className="filters-head">
               <h2 className="filters-title">Filters</h2>
-              <span style={{ color: "#e2e8f0", fontWeight: 700 }}>{cats.length} cats found</span>
+              <span style={{ color: "#e2e8f0", fontWeight: 700 }}>
+                {cats.length} cats found
+              </span>
             </div>
 
             <div className="filters-grid">
               <div className="field">
                 <label>Search</label>
                 <input
+                  data-testid="search-input"
                   className="input"
                   placeholder="Search by name..."
                   value={filters.search}
-                  onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                  onChange={(e) =>
+                    setFilters({ ...filters, search: e.target.value })
+                  }
                 />
               </div>
 
@@ -653,6 +672,7 @@ export default function CatsList() {
                     <span>{ageDraft[0]}</span>
                   </div>
                   <Slider
+                    data-testid="min-age-slider"
                     min={MIN}
                     max={MAX}
                     value={ageDraft[0]}
@@ -662,8 +682,10 @@ export default function CatsList() {
                     }}
                     onChangeCommitted={(_, value) => {
                       if (typeof value !== "number") return;
+
                       const newMin = value;
                       const adjustedMax = Math.max(newMin, ageDraft[1]);
+
                       setFilters((prev) => ({
                         ...prev,
                         minAge: String(newMin),
@@ -682,6 +704,7 @@ export default function CatsList() {
                     <span>{ageDraft[1]}</span>
                   </div>
                   <Slider
+                    data-testid="max-age-slider"
                     min={MIN}
                     max={MAX}
                     value={ageDraft[1]}
@@ -691,8 +714,10 @@ export default function CatsList() {
                     }}
                     onChangeCommitted={(_, value) => {
                       if (typeof value !== "number") return;
+
                       const newMax = value;
                       const adjustedMin = Math.min(ageDraft[0], newMax);
+
                       setFilters((prev) => ({
                         ...prev,
                         minAge: String(adjustedMin),
@@ -706,9 +731,12 @@ export default function CatsList() {
               <div className="field">
                 <label>Breed</label>
                 <select
+                  data-testid="breed-filter"
                   className="input"
                   value={filters.breedId}
-                  onChange={(e) => setFilters({ ...filters, breedId: e.target.value })}
+                  onChange={(e) =>
+                    setFilters({ ...filters, breedId: e.target.value })
+                  }
                 >
                   <option value="">All Breeds</option>
                   {breeds.map((b) => (
@@ -722,9 +750,12 @@ export default function CatsList() {
               <div className="field">
                 <label>Status</label>
                 <select
+                  data-testid="status-filter"
                   className="input"
                   value={filters.status}
-                  onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                  onChange={(e) =>
+                    setFilters({ ...filters, status: e.target.value })
+                  }
                 >
                   <option value="">All Status</option>
                   <option value="AVAILABLE">AVAILABLE</option>
@@ -736,29 +767,43 @@ export default function CatsList() {
               <div className="field">
                 <label>From Date</label>
                 <input
+                  data-testid="from-date-filter"
                   type="date"
                   className="input"
                   value={filters.fromDate}
-                  onChange={(e) => setFilters({ ...filters, fromDate: e.target.value })}
+                  onChange={(e) =>
+                    setFilters({ ...filters, fromDate: e.target.value })
+                  }
                 />
               </div>
 
               <div className="field">
                 <label>To Date</label>
                 <input
+                  data-testid="to-date-filter"
                   type="date"
                   className="input"
                   value={filters.toDate}
-                  onChange={(e) => setFilters({ ...filters, toDate: e.target.value })}
+                  onChange={(e) =>
+                    setFilters({ ...filters, toDate: e.target.value })
+                  }
                 />
               </div>
             </div>
 
             <div className="button-row">
-              <button className="btn" onClick={loadCats}>
+              <button
+                data-testid="search-button"
+                className="btn"
+                onClick={loadCats}
+              >
                 🔎 Search
               </button>
-              <button className="btn-outline" onClick={clearFilters}>
+              <button
+                data-testid="clear-button"
+                className="btn-outline"
+                onClick={clearFilters}
+              >
                 Clear
               </button>
             </div>
@@ -794,7 +839,9 @@ export default function CatsList() {
                           <div className="empty-emoji">🔍</div>
                           <h2 style={{ margin: 0 }}>No Cats Found</h2>
                           <p style={{ margin: 0, color: "#94a3b8" }}>
-                            {admin ? "Try adjusting your filters." : "No owned cats match your filters."}
+                            {admin
+                              ? "Try adjusting your filters."
+                              : "No owned cats match your filters."}
                           </p>
                         </div>
                       </td>
@@ -885,7 +932,8 @@ export default function CatsList() {
                     const file = e.target.files?.[0];
                     if (!file) return;
                     const reader = new FileReader();
-                    reader.onload = () => setForm({ ...form, image: reader.result as string });
+                    reader.onload = () =>
+                      setForm({ ...form, image: reader.result as string });
                     reader.readAsDataURL(file);
                   }}
                 />
@@ -893,14 +941,23 @@ export default function CatsList() {
               <button
                 className="btn"
                 onClick={async () => {
-                  const res = await fetch("https://api.thecatapi.com/v1/images/search");
+                  const res = await fetch(
+                    "https://api.thecatapi.com/v1/images/search",
+                  );
                   const data = await res.json();
                   setForm({ ...form, image: data[0]?.url || "" });
                 }}
               >
                 🤖 Generate Image
               </button>
-              {form.image && <img src={form.image} alt="Preview" className="preview" loading="lazy" />}
+              {form.image && (
+                <img
+                  src={form.image}
+                  alt="Preview"
+                  className="preview"
+                  loading="lazy"
+                />
+              )}
               <button className="btn" onClick={handleCreate}>
                 Save
               </button>
@@ -912,18 +969,24 @@ export default function CatsList() {
               <input
                 className="input"
                 value={editing.name}
-                onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                onChange={(e) =>
+                  setEditing({ ...editing, name: e.target.value })
+                }
               />
               <input
                 type="number"
                 className="input"
                 value={editing.age}
-                onChange={(e) => setEditing({ ...editing, age: Number(e.target.value) })}
+                onChange={(e) =>
+                  setEditing({ ...editing, age: Number(e.target.value) })
+                }
               />
               <select
                 className="input"
                 value={editing.status}
-                onChange={(e) => setEditing({ ...editing, status: e.target.value })}
+                onChange={(e) =>
+                  setEditing({ ...editing, status: e.target.value })
+                }
               >
                 <option value="AVAILABLE">Available</option>
                 <option value="ADOPTED">Adopted</option>
@@ -936,7 +999,9 @@ export default function CatsList() {
                   setEditing({
                     ...editing,
                     breedId: Number(e.target.value),
-                    breed: breeds.find((b) => b.id === Number(e.target.value)) || editing.breed,
+                    breed:
+                      breeds.find((b) => b.id === Number(e.target.value)) ||
+                      editing.breed,
                   })
                 }
               >
@@ -946,11 +1011,20 @@ export default function CatsList() {
                   </option>
                 ))}
               </select>
-              <label style={{ display: "flex", gap: 10, alignItems: "center", color: "white" }}>
+              <label
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  alignItems: "center",
+                  color: "white",
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={Boolean(editing.priority)}
-                  onChange={(e) => setEditing({ ...editing, priority: e.target.checked })}
+                  onChange={(e) =>
+                    setEditing({ ...editing, priority: e.target.checked })
+                  }
                 />
                 Priority
               </label>

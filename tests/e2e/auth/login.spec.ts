@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
-import { registerUserViaApi } from '../utils/authApi';
+import { registerUserViaApi } from '../utils/helperApi';
 
 test.describe('Login', () => {
   test('registered user can login', async ({ page, request, testUser }) => {

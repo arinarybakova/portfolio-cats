@@ -1,6 +1,6 @@
 import { test as base } from '@playwright/test';
 import { createTestUser, type TestUser } from '../utils/testUser';
-import { deleteUserViaApi } from '../utils/authApi';
+import { deleteUserViaApi } from '../utils/helperApi';
 
 type Fixtures = {
   testUser: TestUser;

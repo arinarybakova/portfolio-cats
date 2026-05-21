@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test';
 import { RegisterPage } from '../pages/RegisterPage';
+import { registerUserViaApi } from '../utils/helperApi';
 
 test.describe('Register', () => {
   test('user can register with valid data', async ({ page, testUser }) => {
@@ -18,5 +19,15 @@ test.describe('Register', () => {
     await registerPage.submit();
 
     await registerPage.expectErrorMessage('Name, email and password are required');
+  });
+
+  test('user that already exists cannot register', async ({ page, request, testUser }) => {
+    const registerPage = new RegisterPage(page);
+    await registerUserViaApi(request, testUser);
+    await registerPage.open();
+    await registerPage.register(testUser);
+    await registerPage.submit();
+
+    await registerPage.expectErrorMessage('Email is already registered');
   });
 });

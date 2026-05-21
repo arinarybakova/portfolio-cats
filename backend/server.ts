@@ -123,6 +123,17 @@ function requireAdmin(req: AuthRequest, res: express.Response, next: express.Nex
   next();
 }
 
+const DEFAULT_CAT_IMAGE =
+  "https://placehold.co/300x300/e5e7eb/6b7280?text=Cat";
+
+function normalizeCatImage(image: unknown) {
+  if (typeof image === "string" && image.trim() !== "") {
+    return image.trim();
+  }
+
+  return DEFAULT_CAT_IMAGE;
+}
+
 /* =======================================================
    AUTH
 ======================================================= */
@@ -743,6 +754,50 @@ app.put("/users/:id", authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
+app.delete('/test/users/:email', async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Not allowed in production' });
+  }
+
+  const email = decodeURIComponent(req.params.email).trim().toLowerCase();
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { cats: true, addresses: true },
+    });
+
+    if (!user) {
+      return res.json({ message: 'User already deleted' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Delete user-owned addresses
+      await tx.address.deleteMany({
+        where: { userId: user.id },
+      });
+
+      // Delete cats assigned to this test user
+      await tx.cat.deleteMany({
+        where: { ownerId: user.id },
+      });
+
+      // Delete user
+      await tx.user.delete({
+        where: { id: user.id },
+      });
+    });
+
+    res.json({
+      message: 'Test user and related data deleted',
+      email,
+    });
+  } catch (error) {
+    console.error('DELETE /test/users/:email error:', error);
+    res.status(500).json({ error: 'Failed to delete test user' });
+  }
+});
+
 app.delete("/users/:id", authMiddleware, requireAdmin, async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -757,7 +812,7 @@ app.delete("/users/:id", authMiddleware, requireAdmin, async (req, res) => {
     res.status(500).json({ error: "Failed to delete user" });
   }
 
-  
+
 });
 
 /* =======================================================
@@ -780,7 +835,7 @@ app.get("/breeds", authMiddleware, requireAdmin, async (req, res) => {
 
 app.get("/cats", authMiddleware, requireAdmin, async (req, res) => {
   console.log("🔥 CATS ROUTE HIT");
-console.log("QUERY RECEIVED:", req.query);
+  console.log("QUERY RECEIVED:", req.query);
   try {
     const {
       search,
@@ -916,7 +971,7 @@ app.get("/cats/:id", authMiddleware, async (req: AuthRequest, res) => {
 ======================================================= */
 
 app.post("/cats", authMiddleware, requireAdmin, async (req, res) => {
-    try {
+  try {
     const { name, age, image, status, breedId } = req.body;
     const priority = parseBoolean(req.body?.priority) ?? false;
 
@@ -924,7 +979,7 @@ app.post("/cats", authMiddleware, requireAdmin, async (req, res) => {
       data: {
         name,
         age: Number(age),
-        image,
+        image: normalizeCatImage(req.body?.image),
         status: status || "AVAILABLE",
         priority: Boolean(priority) || false,
         breed: {
@@ -939,7 +994,9 @@ app.post("/cats", authMiddleware, requireAdmin, async (req, res) => {
     res.status(201).json(newCat);
   } catch (error) {
     console.error("POST /cats error:", error);
-    res.status(500).json({ error: "Failed to create cat" });
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Failed to create cat",
+    });
   }
 });
 
@@ -972,7 +1029,7 @@ app.put("/cats/:id", authMiddleware, requireAdmin, async (req, res) => {
       data: {
         name,
         age: Number(age),
-        image,
+        image: normalizeCatImage(image),
         status,
 
         // ✅ THIS is the actual write
