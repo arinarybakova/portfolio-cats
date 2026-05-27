@@ -819,7 +819,7 @@ app.delete("/users/:id", authMiddleware, requireAdmin, async (req, res) => {
    BREEDS
 ======================================================= */
 
-app.get("/breeds", authMiddleware, requireAdmin, async (req, res) => {
+app.get("/breeds", authMiddleware, async (req, res) => {
   try {
     const breeds = await prisma.breed.findMany();
     res.json(breeds);

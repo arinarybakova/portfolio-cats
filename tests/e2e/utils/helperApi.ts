@@ -1,5 +1,6 @@
 import { APIRequestContext, expect } from '@playwright/test';
 import type { TestUser } from './testUser';
+import type { Page } from '@playwright/test';
 
 const API_URL = process.env.API_URL ?? 'http://localhost:5000';
 
@@ -28,7 +29,7 @@ export async function createAdminViaApi(
 ) {
   const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-  const admin = {
+  const admin: TestUser = {
     name: `E2E Admin ${id}`,
     email: `e2e-admin-${id}@test.com`,
     password: 'Password123!',
@@ -117,11 +118,11 @@ export async function createCatViaApi(
     data: cat,
   });
 
-if (!response.ok()) {
-  throw new Error(
-    `Request failed: ${response.status()} ${await response.text()}`
-  );
-}
+  if (!response.ok()) {
+    throw new Error(
+      `Request failed: ${response.status()} ${await response.text()}`
+    );
+  }
   return response.json();
 }
 
@@ -158,4 +159,43 @@ export async function getBreedsViaApi(
   expect(response.ok()).toBeTruthy();
 
   return response.json();
+}
+
+export async function authenticateViaApi(
+  page: Page,
+  request: APIRequestContext,
+  user: TestUser,
+) {
+  const loginData = await loginUserViaApi(
+    request,
+    user,
+  );
+
+  await page.goto('/');
+
+  await page.evaluate(
+    ({ token, user }) => {
+      localStorage.setItem(
+        'token',
+        token,
+      );
+
+      localStorage.setItem(
+        'user',
+        JSON.stringify(user),
+      );
+
+      window.dispatchEvent(
+        new Event('authChanged'),
+      );
+    },
+    {
+      token: loginData.token,
+      user: loginData.user,
+    },
+  );
+
+  await page.reload();
+
+  return loginData;
 }

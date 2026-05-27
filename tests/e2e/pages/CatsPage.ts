@@ -14,6 +14,12 @@ export class CatsPage {
   readonly maxAgeSlider: Locator;
   readonly searchButton: Locator;
   readonly clearButton: Locator;
+  readonly addCatButton: Locator;
+  readonly catNameInput: Locator;
+  readonly catAgeInput: Locator;
+  readonly catBreedSelect: Locator;
+  readonly catStatusSelect: Locator;
+  readonly saveCatButton: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -30,6 +36,30 @@ export class CatsPage {
     this.maxAgeSlider = page.getByTestId('max-age-slider').locator('[role="slider"]');
     this.searchButton = page.getByTestId('search-button');
     this.clearButton = page.getByTestId('clear-button');
+
+    this.addCatButton = page.getByRole('button', {
+      name: /add cat/i,
+    });
+
+    this.catNameInput = page.locator(
+      '.modal-body input[placeholder="Name"]',
+    );
+
+    this.catAgeInput = page.locator(
+      '.modal-body input[placeholder="Age"]',
+    );
+
+    this.catBreedSelect = page.locator(
+      '.modal-body select',
+    ).nth(0);
+
+    this.catStatusSelect = page.locator(
+      '.modal-body select',
+    ).nth(1);
+
+    this.saveCatButton = page.getByRole('button', {
+      name: /^save$/i,
+    });
   }
 
   async goto() {
@@ -49,9 +79,20 @@ export class CatsPage {
     await this.searchButton.click();
   }
 
-  async filterByBreed(breedId: number) {
-    await this.breedFilter.selectOption(String(breedId));
-    await this.searchButton.click();
+  async filterByBreedId(breedId: string) {
+    const select = this.page.getByTestId('breed-filter');
+
+    await select.waitFor({ state: 'visible' });
+
+    await select.selectOption(breedId);
+
+    await Promise.all([
+      this.page.waitForResponse((res) =>
+        res.url().includes('/cats') &&
+        res.request().method() === 'GET'
+      ),
+      this.searchButton.click(),
+    ]);
   }
 
   async filterByStatus(status: 'AVAILABLE' | 'ADOPTED' | 'PENDING') {
@@ -88,23 +129,41 @@ export class CatsPage {
     }
   }
 
-  async setMinAgeByKeyboard(steps: number) {
-    await this.minAgeSlider.focus();
+ async setMinAgeByKeyboard(steps: number) {
+  const slider = this.page.getByTestId('min-age-slider');
 
-    for (let i = 0; i < steps; i++) {
-      await this.page.keyboard.press('ArrowRight');
-    }
+  await slider.waitFor({ state: 'visible' });
+  await slider.click();
+
+  for (let i = 0; i < steps; i++) {
+    await this.page.keyboard.press('ArrowRight');
   }
+}
 
-  async setMaxAgeByKeyboard(steps: number) {
-    await this.maxAgeSlider.focus();
+async setMaxAgeByKeyboard(steps: number) {
+  const slider = this.page.getByTestId('max-age-slider');
 
-    for (let i = 0; i < steps; i++) {
-      await this.page.keyboard.press('ArrowLeft');
-    }
+  await slider.waitFor({ state: 'visible' });
+  await slider.click();
+
+  for (let i = 0; i < steps; i++) {
+    await this.page.keyboard.press('ArrowLeft');
   }
+}
 
   async applyFilters() {
     await this.searchButton.click();
+  }
+
+  async deleteCatByName(name: string) {
+    const row = this.page.locator('tr', {
+      hasText: name,
+    });
+
+    await expect(row).toBeVisible();
+
+    await row.getByRole('button', {
+      name: /delete/i,
+    }).click();
   }
 }

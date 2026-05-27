@@ -890,12 +890,14 @@ export default function CatsList() {
           {admin && showAdd && (
             <Modal title="Add Cat" onClose={() => setShowAdd(false)}>
               <input
+                data-testid="cat-name-input"
                 className="input"
                 placeholder="Name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
               <input
+                data-testid="cat-age-input"
                 type="number"
                 className="input"
                 placeholder="Age"
@@ -903,6 +905,7 @@ export default function CatsList() {
                 onChange={(e) => setForm({ ...form, age: e.target.value })}
               />
               <select
+                data-testid="cat-breed-select"
                 className="input"
                 value={form.breedId}
                 onChange={(e) => setForm({ ...form, breedId: e.target.value })}
@@ -915,6 +918,7 @@ export default function CatsList() {
                 ))}
               </select>
               <select
+                data-testid="cat-status-select"
                 className="input"
                 value={form.status}
                 onChange={(e) => setForm({ ...form, status: e.target.value })}
@@ -939,6 +943,7 @@ export default function CatsList() {
                 />
               </div>
               <button
+                data-testid="save-cat-button"
                 className="btn"
                 onClick={async () => {
                   const res = await fetch(

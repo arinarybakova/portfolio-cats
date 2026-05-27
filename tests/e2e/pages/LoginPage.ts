@@ -7,6 +7,7 @@ export class LoginPage {
   passwordInput = () => this.page.getByTestId('login-password');
   submitButton = () => this.page.getByTestId('login-submit');
   errorMessage = () => this.page.getByTestId('login-error');
+  adminTab = () => this.page.getByTestId('admin-tab');
 
   async open() {
     await this.page.goto('/login');
@@ -27,5 +28,9 @@ export class LoginPage {
   async expectErrorMessage(message: string) {
     await expect(this.errorMessage()).toBeVisible({ timeout: 10_000 });
     await expect(this.errorMessage()).toHaveText(message);
+  }
+
+  async clickAdminTab(){
+    await this.adminTab().click();
   }
 }

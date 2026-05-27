@@ -370,6 +370,7 @@ export default function Login() {
                   User
                 </button>
                 <button
+                  data-testid="admin-tab"
                   type="button"
                   className={`tab-btn ${role === "ADMIN" ? "active" : ""}`}
                   onClick={() => setRole("ADMIN")}
