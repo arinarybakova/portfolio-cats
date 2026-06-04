@@ -9,6 +9,7 @@ export class CatDetailsPage {
     status: 'AVAILABLE' | 'ADOPTED' | 'PENDING';
     priority: boolean;
     breedName?: string;
+    ownerName?: string | null;
   }) {
     const nameHeading = this.page.locator('.cat-name');
 
@@ -33,6 +34,13 @@ export class CatDetailsPage {
       await expect(
         this.page.locator('.info-card').filter({ hasText: 'Breed' }),
       ).toContainText(data.breedName);
+    }
+
+    if (data.ownerName !== undefined) {
+      const ownerCard = this.page.locator('.info-card').filter({ hasText: 'Owner' });
+      await expect(ownerCard).toContainText(
+        data.ownerName ?? 'No owner yet',
+      );
     }
   }
 
@@ -85,6 +93,41 @@ export class CatDetailsPage {
         res.url().includes(`/cats/${catId}`) &&
         res.ok(),
     );
+  }
+
+  async waitForAssignOwner(catId: number) {
+    return this.page.waitForResponse(
+      (res) =>
+        res.request().method() === 'POST' &&
+        res.url().includes(`/cats/${catId}/assign-owner`) &&
+        res.ok(),
+    );
+  }
+
+  ownerSelectInEdit() {
+    return this.page
+      .locator('.edit-stack select')
+      .filter({ has: this.page.locator('option', { hasText: 'Select Owner' }) });
+  }
+
+  async assignOwnerViaUI(catId: number, ownerName: string) {
+    await this.ownerSelectInEdit().selectOption({ label: ownerName });
+
+    await Promise.all([
+      this.waitForAssignOwner(catId),
+      this.page.getByRole('button', { name: /assign owner/i }).click(),
+    ]);
+
+    await expect(
+      this.page.getByRole('button', { name: /remove owner/i }),
+    ).toBeVisible();
+  }
+
+  async cancelEdit() {
+    await this.page.getByRole('button', { name: /cancel/i }).click();
+    await expect(
+      this.page.getByRole('button', { name: /save changes/i }),
+    ).toBeHidden();
   }
 
   async saveChanges(catId: number) {

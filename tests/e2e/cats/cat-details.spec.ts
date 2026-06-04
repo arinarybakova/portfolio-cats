@@ -5,15 +5,17 @@ import {
   authenticateViaApi,
   createAdminViaApi,
   createCatViaApi,
+  createUserViaApi,
   getFirstBreedViaApi,
 } from '../utils/helperApi';
 
 test.describe('Cat details', () => {
-  test('admin can create cat via UI, add priority, and see it in table', async ({
+  test('admin can create cat via UI, add priority, assign owner, and see it in table', async ({
     page,
     request,
   }) => {
     const adminData = await createAdminViaApi(request);
+    const owner = await createUserViaApi(request);
     const breed = await getFirstBreedViaApi(request, adminData.token);
 
     const catName = `E2E UI Cat ${Date.now()}`;
@@ -21,6 +23,8 @@ test.describe('Cat details', () => {
     await authenticateViaApi(page, request, adminData.admin);
 
     const catsPage = new CatsPage(page);
+    const catDetailsPage = new CatDetailsPage(page);
+
     await catsPage.goto();
 
     const createdCat = await catsPage.createCatViaUI({
@@ -40,13 +44,39 @@ test.describe('Cat details', () => {
 
     await catsPage.setPriorityViaEditModal(catName, createdCat.id, true);
     await catsPage.expectPriorityVisibleInTable(catName);
+
+    await catsPage.openCatDetails(catName);
+    await expect(page).toHaveURL(new RegExp(`/cats/${createdCat.id}$`));
+
+    await catDetailsPage.expectCatDetails({
+      name: catName,
+      age: 4,
+      status: 'AVAILABLE',
+      priority: true,
+      breedName: breed.name,
+      ownerName: null,
+    });
+
+    await catDetailsPage.openEdit();
+    await catDetailsPage.assignOwnerViaUI(createdCat.id, owner.name);
+    await catDetailsPage.cancelEdit();
+
+    await catDetailsPage.expectCatDetails({
+      name: catName,
+      age: 4,
+      status: 'ADOPTED',
+      priority: true,
+      breedName: breed.name,
+      ownerName: owner.name,
+    });
   });
 
-  test('admin can edit cat data and priority on details page', async ({
+  test('admin can edit cat data and priority on details page and assign owner', async ({
     page,
     request,
   }) => {
     const adminData = await createAdminViaApi(request);
+    const owner = await createUserViaApi(request);
     const breed = await getFirstBreedViaApi(request, adminData.token);
 
     const originalName = `E2E Details Original ${Date.now()}`;
@@ -74,6 +104,7 @@ test.describe('Cat details', () => {
       status: 'AVAILABLE',
       priority: false,
       breedName: breed.name,
+      ownerName: null,
     });
 
     await catDetailsPage.openEdit();
@@ -91,23 +122,38 @@ test.describe('Cat details', () => {
       status: 'PENDING',
       priority: true,
       breedName: breed.name,
+      ownerName: null,
+    });
+
+    await catDetailsPage.openEdit();
+    await catDetailsPage.assignOwnerViaUI(cat.id, owner.name);
+    await catDetailsPage.cancelEdit();
+
+    await catDetailsPage.expectCatDetails({
+      name: updatedName,
+      age: 5,
+      status: 'ADOPTED',
+      priority: true,
+      breedName: breed.name,
+      ownerName: owner.name,
     });
 
     await page.goto('/cats');
     await catsPage.expectCatVisible(updatedName);
     await catsPage.expectCatRowDetails(updatedName, {
       age: 5,
-      status: 'PENDING',
+      status: 'ADOPTED',
       breedName: breed.name,
     });
     await catsPage.expectPriorityVisibleInTable(updatedName);
   });
 
-  test('admin can edit cat via list modal and validate changes on details page', async ({
+  test('admin can edit cat via list modal, assign owner on details, and validate changes', async ({
     page,
     request,
   }) => {
     const adminData = await createAdminViaApi(request);
+    const owner = await createUserViaApi(request);
     const breed = await getFirstBreedViaApi(request, adminData.token);
 
     const originalName = `E2E Modal Original ${Date.now()}`;
@@ -157,6 +203,20 @@ test.describe('Cat details', () => {
       status: 'ADOPTED',
       priority: true,
       breedName: breed.name,
+      ownerName: null,
+    });
+
+    await catDetailsPage.openEdit();
+    await catDetailsPage.assignOwnerViaUI(cat.id, owner.name);
+    await catDetailsPage.cancelEdit();
+
+    await catDetailsPage.expectCatDetails({
+      name: updatedName,
+      age: 7,
+      status: 'ADOPTED',
+      priority: true,
+      breedName: breed.name,
+      ownerName: owner.name,
     });
 
     await page.goto('/cats');

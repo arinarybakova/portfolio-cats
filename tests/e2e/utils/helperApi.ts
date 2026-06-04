@@ -1,6 +1,7 @@
 import { APIRequestContext, expect } from '@playwright/test';
 import type { TestUser } from './testUser';
 import type { Page } from '@playwright/test';
+import { createTestUser } from './testUser';
 
 const API_URL = process.env.API_URL ?? 'http://localhost:5000';
 
@@ -124,6 +125,21 @@ export async function createCatViaApi(
     );
   }
   return response.json();
+}
+
+export async function createUserViaApi(request: APIRequestContext) {
+  const user = createTestUser('USER');
+
+  await registerUserViaApi(request, user);
+
+  const loginData = await loginUserViaApi(request, user);
+
+  return {
+    user,
+    id: loginData.user.id as number,
+    name: loginData.user.name as string,
+    token: loginData.token as string,
+  };
 }
 
 export async function assignCatOwnerViaApi(
