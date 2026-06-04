@@ -166,4 +166,161 @@ async setMaxAgeByKeyboard(steps: number) {
       name: /delete/i,
     }).click();
   }
+
+  editModalBody() {
+    return this.page.locator('.modal-body');
+  }
+
+  editModalPriorityCheckbox() {
+    return this.editModalBody()
+      .locator('label')
+      .filter({ hasText: 'Priority' })
+      .getByRole('checkbox');
+  }
+
+  async openEditModalForCat(name: string) {
+    const row = this.catRow(name);
+    await row.getByRole('button', { name: /edit/i }).click();
+    await expect(this.page.getByRole('heading', { name: 'Edit Cat' })).toBeVisible();
+  }
+
+  async waitForCatCreate() {
+    return this.page.waitForResponse(
+      (res) =>
+        res.request().method() === 'POST' &&
+        /\/cats\/?(\?|$)/.test(res.url()) &&
+        res.ok(),
+    );
+  }
+
+  async waitForCatUpdate(catId: number) {
+    return this.page.waitForResponse(
+      (res) =>
+        res.request().method() === 'PUT' &&
+        res.url().includes(`/cats/${catId}`) &&
+        res.ok(),
+    );
+  }
+
+  async createCatViaUI(data: {
+    name: string;
+    age: number;
+    breedId: number;
+    status: 'AVAILABLE' | 'ADOPTED' | 'PENDING';
+  }) {
+    await this.addCatButton.click();
+    await expect(this.page.getByRole('heading', { name: 'Add Cat' })).toBeVisible();
+
+    await this.catNameInput.fill(data.name);
+    await this.catAgeInput.fill(String(data.age));
+    await this.catBreedSelect.selectOption(String(data.breedId));
+    await this.catStatusSelect.selectOption(data.status);
+
+    const [response] = await Promise.all([
+      this.waitForCatCreate(),
+      this.saveCatButton.click(),
+    ]);
+
+    await expect(this.page.getByRole('heading', { name: 'Add Cat' })).toBeHidden();
+
+    return response.json() as Promise<{ id: number; name: string }>;
+  }
+
+  async updateCatViaEditModal(
+    name: string,
+    catId: number,
+    updates: {
+      name?: string;
+      age?: number;
+      status?: 'AVAILABLE' | 'ADOPTED' | 'PENDING';
+      priority?: boolean;
+    },
+  ) {
+    await this.openEditModalForCat(name);
+
+    const modal = this.editModalBody();
+
+    if (updates.name !== undefined) {
+      await modal.locator('input').first().fill(updates.name);
+    }
+
+    if (updates.age !== undefined) {
+      await modal.locator('input[type="number"]').fill(String(updates.age));
+    }
+
+    if (updates.status !== undefined) {
+      await modal.locator('select').first().selectOption(updates.status);
+    }
+
+    if (updates.priority !== undefined) {
+      const checkbox = this.editModalPriorityCheckbox();
+
+      if (updates.priority) {
+        await checkbox.check();
+      } else {
+        await checkbox.uncheck();
+      }
+    }
+
+    await Promise.all([
+      this.waitForCatUpdate(catId),
+      this.page.getByRole('button', { name: /^update$/i }).click(),
+    ]);
+
+    await expect(this.page.getByRole('heading', { name: 'Edit Cat' })).toBeHidden();
+  }
+
+  async setPriorityViaEditModal(
+    name: string,
+    catId: number,
+    priority: boolean,
+  ) {
+    await this.updateCatViaEditModal(name, catId, { priority });
+  }
+
+  async expectCatRowDetails(
+    name: string,
+    data: {
+      age: number;
+      status: 'AVAILABLE' | 'ADOPTED' | 'PENDING';
+      breedName?: string;
+    },
+  ) {
+    const row = this.catRow(name);
+
+    await expect(row).toContainText(String(data.age));
+    await expect(row.locator(`.status-pill.status-${data.status}`)).toBeVisible();
+
+    if (data.breedName) {
+      await expect(row).toContainText(data.breedName);
+    }
+  }
+
+  async hasPriorityInTable(name: string) {
+    const row = this.catRow(name);
+    await expect(row).toBeVisible();
+
+    const hasPriorityRowClass = await row.evaluate((el) =>
+      el.classList.contains('priority-row'),
+    );
+    const crownVisible = await row.getByText('👑').isVisible();
+
+    return hasPriorityRowClass || crownVisible;
+  }
+
+  async expectPriorityVisibleInTable(name: string) {
+    const row = this.catRow(name);
+    await expect(row).toHaveClass(/priority-row/);
+    await expect(row.getByText('👑')).toBeVisible();
+  }
+
+  async expectPriorityHiddenInTable(name: string) {
+    const row = this.catRow(name);
+    await expect(row).not.toHaveClass(/priority-row/);
+    await expect(row.getByText('👑')).toBeHidden();
+  }
+
+  async openCatDetails(name: string) {
+    await this.catRow(name).locator('.name-link').click();
+  }
 }

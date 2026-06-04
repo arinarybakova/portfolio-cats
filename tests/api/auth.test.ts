@@ -6,13 +6,24 @@ describe('Auth - User Register', () => {
         const { res, payload } = await registerUser()
         const data = res.data as any
         expect(res.status).toBe(201);
-        expect(data).not.toHaveProperty("token")
+        expect(data).toHaveProperty("token")
+        expect(typeof data.token).toBe("string")
         expect(data).toHaveProperty("user")
         expect(data.user.id).toBeTypeOf("number")
         expect(data.user.name).toBe(payload.name)
         expect(data.user.email).toBe(payload.email.toLowerCase())
         expect(data.user.role).toBe("USER")
         });
+
+    it("registers a new admin successfully", async () => {
+        const { res, payload } = await registerUser({ role: "ADMIN" })
+        const data = res.data as any
+        expect(res.status).toBe(201);
+        expect(data).toHaveProperty("token")
+        expect(typeof data.token).toBe("string")
+        expect(data.user.role).toBe("ADMIN")
+        expect(data.user.email).toBe(payload.email.toLowerCase())
+    })
 
     it('fails when name, email and password are missing', async () => {
         const { res: response }  = await registerUser({email: '', name: '', password: ''})

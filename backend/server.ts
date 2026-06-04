@@ -181,8 +181,15 @@ app.post("/auth/register", async (req, res) => {
       },
     });
 
+    const token = createToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    });
+
     res.status(201).json({
       message: "User registered successfully",
+      token,
       user: {
         id: user.id,
         name: user.name,
