@@ -2,6 +2,8 @@ import { APIRequestContext, expect } from '@playwright/test';
 import type { TestUser } from './testUser';
 import type { Page } from '@playwright/test';
 import { createTestUser } from './testUser';
+import { prisma } from '../../../backend/prisma';
+import { generateToken } from '../../api/utils.ts/jwtHelper';
 
 const API_URL = process.env.API_URL ?? 'http://localhost:5000';
 
@@ -177,33 +179,27 @@ export async function getBreedsViaApi(
   return response.json();
 }
 
-export async function authenticateViaApi(
-  page: Page,
-  request: APIRequestContext,
-  user: TestUser,
-) {
-  const loginData = await loginUserViaApi(
-    request,
-    user,
-  );
+type AuthSession = {
+  token: string;
+  user: {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+  };
+};
 
+async function setBrowserAuthSession(
+  page: Page,
+  loginData: AuthSession,
+) {
   await page.goto('/');
 
   await page.evaluate(
     ({ token, user }) => {
-      localStorage.setItem(
-        'token',
-        token,
-      );
-
-      localStorage.setItem(
-        'user',
-        JSON.stringify(user),
-      );
-
-      window.dispatchEvent(
-        new Event('authChanged'),
-      );
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      window.dispatchEvent(new Event('authChanged'));
     },
     {
       token: loginData.token,
@@ -212,6 +208,83 @@ export async function authenticateViaApi(
   );
 
   await page.reload();
+}
+
+export async function getExistingUserSessionViaApi(
+  request: APIRequestContext,
+  user: TestUser,
+) {
+  if (user.password) {
+    const loginResponse = await request.post(`${API_URL}/auth/login`, {
+      data: {
+        email: user.email,
+        password: user.password,
+        role: user.role,
+      },
+    });
+
+    if (loginResponse.ok()) {
+      return loginResponse.json() as Promise<AuthSession>;
+    }
+  }
+
+  const dbUser = await prisma.user.findUnique({
+    where: { email: user.email.trim().toLowerCase() },
+  });
+
+  if (!dbUser) {
+    throw new Error(`Existing user not found: ${user.email}`);
+  }
+
+  const token = generateToken({
+    id: dbUser.id,
+    email: dbUser.email,
+    role: dbUser.role,
+  });
+
+  return {
+    token,
+    user: {
+      id: dbUser.id,
+      name: dbUser.name,
+      email: dbUser.email,
+      role: dbUser.role,
+    },
+  };
+}
+
+export async function ensureCatUnassignedViaApi(
+  request: APIRequestContext,
+  token: string,
+  catId: number,
+) {
+  await request.post(`${API_URL}/cats/${catId}/remove-owner`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function authenticateViaApi(
+  page: Page,
+  request: APIRequestContext,
+  user: TestUser,
+) {
+  const loginData = await loginUserViaApi(request, user);
+
+  await setBrowserAuthSession(page, loginData);
+
+  return loginData;
+}
+
+export async function authenticateExistingUserViaApi(
+  page: Page,
+  request: APIRequestContext,
+  user: TestUser,
+) {
+  const loginData = await getExistingUserSessionViaApi(request, user);
+
+  await setBrowserAuthSession(page, loginData);
 
   return loginData;
 }

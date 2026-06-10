@@ -3,9 +3,17 @@ import { UsersPage } from '../pages/UsersPage';
 import { UserDetailsPage } from '../pages/UserDetailsPage';
 import {
   authenticateViaApi,
+  authenticateExistingUserViaApi,
   createAdminViaApi,
   createUserViaApi,
+  ensureCatUnassignedViaApi,
+  getExistingUserSessionViaApi,
 } from '../utils/helperApi';
+import {
+  existingAdmin,
+  existingAssignUser,
+  existingCat,
+} from '../utils/existingTestData';
 
 test.describe('User management', () => {
   test('admin can create and delete a user', async ({ page, request }) => {
@@ -95,5 +103,38 @@ test.describe('User management', () => {
     await page.goto('/users');
     await usersPage.expectUserNotInTable(original.email);
     await usersPage.expectUserInTable(updated);
+  });
+
+  test('admin can assign and remove an existing cat on the user details page', async ({
+    page,
+    request,
+  }) => {
+    const adminSession = await getExistingUserSessionViaApi(
+      request,
+      existingAdmin,
+    );
+
+    await ensureCatUnassignedViaApi(
+      request,
+      adminSession.token,
+      existingCat.id,
+    );
+
+    await authenticateExistingUserViaApi(page, request, existingAdmin);
+
+    const usersPage = new UsersPage(page);
+    const userDetailsPage = new UserDetailsPage(page);
+
+    await usersPage.goto();
+    await usersPage.openUserDetails(existingAssignUser.email);
+    await expect(page).toHaveURL(
+      new RegExp(`/users/${existingAssignUser.id}$`),
+    );
+
+    await userDetailsPage.openOwnedCatsTab();
+    await userDetailsPage.selectAndAssignCat(existingCat, existingAssignUser.id);
+    await userDetailsPage.verifyCatAssigned(existingCat.name);
+    await userDetailsPage.removeCat(existingCat.name);
+    await userDetailsPage.verifyCatRemoved(existingCat.name);
   });
 });

@@ -60,4 +60,59 @@ export class UserDetailsPage {
       this.page.getByText('User info updated successfully.'),
     ).toBeVisible();
   }
+
+  async openOwnedCatsTab() {
+    await this.page.getByRole('button', { name: /owned cats/i }).click();
+    await expect(
+      this.page.getByRole('button', { name: /assign cat/i }),
+    ).toBeVisible();
+  }
+
+  private ownedCatCard(catName: string) {
+    return this.page.locator('.cat-card').filter({ hasText: catName });
+  }
+
+  async selectAndAssignCat(
+    cat: { id: number; name: string },
+    userId: number,
+  ) {
+    await this.page
+      .locator('.stack select')
+      .selectOption(String(cat.id));
+
+    await Promise.all([
+      this.page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          response.url().includes('/assign-owner') &&
+          response.ok(),
+      ),
+      this.page.getByRole('button', { name: /assign cat/i }).click(),
+    ]);
+
+    await expect(this.ownedCatCard(cat.name)).toBeVisible();
+    await expect(this.page).toHaveURL(new RegExp(`/users/${userId}$`));
+  }
+
+  async verifyCatAssigned(catName: string) {
+    await expect(this.ownedCatCard(catName)).toBeVisible();
+  }
+
+  async removeCat(catName: string) {
+    await Promise.all([
+      this.page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          response.url().includes('/remove-owner') &&
+          response.ok(),
+      ),
+      this.ownedCatCard(catName)
+        .getByRole('button', { name: /^remove$/i })
+        .click(),
+    ]);
+  }
+
+  async verifyCatRemoved(catName: string) {
+    await expect(this.ownedCatCard(catName)).toHaveCount(0);
+  }
 }
