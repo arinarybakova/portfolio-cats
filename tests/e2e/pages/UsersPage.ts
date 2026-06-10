@@ -1,8 +1,8 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
-type UserRole = 'USER' | 'ADMIN';
+export type UserRole = 'USER' | 'ADMIN';
 
-type CreateUserInput = {
+export type UserData = {
   name: string;
   email: string;
   role: UserRole;
@@ -36,7 +36,7 @@ export class UsersPage {
     await expect(this.table).toBeVisible();
   }
 
-  async createUser(user: CreateUserInput) {
+  async createUser(user: UserData) {
     await this.nameInput.fill(user.name);
     await this.emailInput.fill(user.email);
     await this.roleSelect.selectOption(user.role);
@@ -52,7 +52,7 @@ export class UsersPage {
     ]);
   }
 
-  async expectUserInTable(user: CreateUserInput) {
+  async expectUserInTable(user: UserData) {
     const row = this.rowForEmail(user.email);
 
     await expect(row).toBeVisible();
@@ -83,6 +83,54 @@ export class UsersPage {
       ),
       row.getByRole('button', { name: /delete/i }).click(),
     ]);
+  }
+
+  async editUserInTable(
+    currentEmail: string,
+    userId: number,
+    updates: Partial<UserData>,
+  ) {
+    await this.openEditModalForUser(currentEmail);
+
+    const modal = this.editModalBody();
+
+    if (updates.name !== undefined) {
+      await modal.locator('input').first().fill(updates.name);
+    }
+
+    if (updates.email !== undefined) {
+      await modal.locator('input[type="email"]').fill(updates.email);
+    }
+
+    if (updates.role !== undefined) {
+      await modal.locator('select').selectOption(updates.role);
+    }
+
+    await Promise.all([
+      this.page.waitForResponse(
+        (response) =>
+          response.request().method() === 'PUT' &&
+          response.url().includes(`/users/${userId}`) &&
+          response.ok(),
+      ),
+      modal.getByRole('button', { name: /^save$/i }).click(),
+    ]);
+
+    await expect(this.page.getByRole('heading', { name: 'Edit User' })).toBeHidden();
+  }
+
+  async openUserDetails(email: string) {
+    await this.rowForEmail(email).locator('.name-link').click();
+  }
+
+  private async openEditModalForUser(email: string) {
+    const row = this.rowForEmail(email);
+    await row.getByRole('button', { name: /^edit$/i }).click();
+    await expect(this.page.getByRole('heading', { name: 'Edit User' })).toBeVisible();
+  }
+
+  private editModalBody() {
+    return this.page.locator('.modal-body');
   }
 
   private rowForEmail(email: string) {
